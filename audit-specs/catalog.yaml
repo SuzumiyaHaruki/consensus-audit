@@ -1,20 +1,16 @@
-version: 1
+version: 2
 
 material_sets:
   raft-etcd-v1:
     protocol: "raft"
     target: "etcd-raft"
-    shared_files:
+    common_files:
       - "fault-models/crash-recovery-cft.md"
       - "protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md"
-    guided_files:
       - "common/AUDIT_TASK.md"
       - "protocols/raft/PROTOCOL_CONTEXT.md"
       - "protocols/raft/EVENT_SEMANTICS.md"
       - "common/REPORT_TEMPLATE.md"
-    baseline_files:
-      - "baseline/AUDIT_TASK.md"
-      - "baseline/REPORT_TEMPLATE.md"
     properties:
       Q-TERM-1: "protocols/raft/properties/Q-TERM-1.md"
       Q-VOTE-1: "protocols/raft/properties/Q-VOTE-1.md"

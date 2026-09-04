@@ -85,8 +85,10 @@ class EvidenceManifestTests(unittest.TestCase):
                 manifest["files"]["search_only"], ["only_search.go"]
             )
             self.assertEqual(manifest["tool_errors"][0]["tool"], "read_file")
+            self.assertEqual(manifest["source_cost"]["files_read"], 1)
+            self.assertEqual(manifest["source_cost"]["unique_source_lines_read"], 13)
+            self.assertEqual(manifest["source_cost"]["search_calls"], 1)
 
 
 if __name__ == "__main__":
     unittest.main()
-

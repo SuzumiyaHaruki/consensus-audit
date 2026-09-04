@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,16 +18,20 @@ from consensus_audit.runner import (
 from consensus_audit.shared_context import SharedAuditContext
 
 
-FINAL_REPORT = """\
-# Consensus Property Audit Report
-
-- Property: `Q-TEST-1`
-- Verdict: `no_credible_risk`
-
-## Summary
-
-No credible risk found in the inspected test source.
-"""
+def final_candidate(*, property_id: str | None) -> str:
+    return json.dumps(
+        {
+            "status": "no_candidate",
+            "property_id": property_id,
+            "property_statement": "A test consensus property.",
+            "summary": "No candidate met the evidence threshold in this run.",
+            "source_evidence": [],
+            "mechanism": None,
+            "causal_chain": [],
+            "test_sketch": None,
+            "uncertainties": [],
+        }
+    )
 
 
 class FakeClient:
@@ -60,9 +66,16 @@ class FakeClient:
                 response_id="one",
                 model="fake",
             )
+        property_id = None
+        for message in messages:
+            match = re.search(
+                r"TARGET_PROPERTY_ID=([^\s]+)", str(message.get("content") or "")
+            )
+            if match is not None:
+                property_id = match.group(1)
         return ChatResponse(
-            content=FINAL_REPORT,
-            reasoning_content="I found no credible risk.",
+            content=final_candidate(property_id=property_id),
+            reasoning_content="No candidate met the evidence threshold.",
             tool_calls=(),
             finish_reason="stop",
             usage={"total_tokens": 20},
@@ -79,8 +92,6 @@ class RunnerTests(unittest.TestCase):
             "Audit Q-TEST-1 and return Markdown.", encoding="utf-8"
         )
         (materials / "shared.md").write_text("shared boundary", encoding="utf-8")
-        (materials / "baseline-task.md").write_text("unguided task", encoding="utf-8")
-        (materials / "baseline-report.md").write_text("unguided report", encoding="utf-8")
         (materials / "property.md").write_text(
             "Q-TEST-1 test property.", encoding="utf-8"
         )
@@ -93,9 +104,7 @@ material_sets:
   test:
     protocol: test
     target: test
-    shared_files: [shared.md]
-    guided_files: [task.md]
-    baseline_files: [baseline-task.md, baseline-report.md]
+    common_files: [shared.md, task.md]
     properties:
       Q-TEST-1: property.md
       Q-TEST-2: property-two.md
@@ -132,6 +141,10 @@ material_sets:
             self.assertTrue(
                 (result.run_directory / "evidence-manifest.json").is_file()
             )
+            self.assertTrue((result.run_directory / "parsed-candidate.json").is_file())
+            self.assertTrue(result.candidate_format_valid)
+            self.assertTrue(result.candidate_provenance_valid)
+            self.assertEqual(result.candidate_status, "no_candidate")
             second_messages = client.calls[1]
             assistant = next(
                 message for message in second_messages if message["role"] == "assistant"
@@ -165,7 +178,7 @@ material_sets:
             self.assertTrue(client.tool_sets[1])
             self.assertEqual(client.tool_sets[2], [])
             self.assertIn(
-                "This is the final report turn",
+                "This is the final Candidate-v0 turn",
                 client.calls[2][-1]["content"],
             )
             self.assertTrue((result.run_directory / "response.md").is_file())
@@ -193,9 +206,9 @@ material_sets:
             prompt = (result.run_directory / "prompt.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn('"audit_mode": "unguided-baseline"', request)
+            self.assertIn('"audit_mode": "matched-no-property"', request)
             self.assertIn('"baseline_episode": 1', request)
-            self.assertIn("AUDIT_MODE=unguided-baseline", prompt)
+            self.assertIn("AUDIT_MODE=matched-no-property", prompt)
             self.assertNotIn("TARGET_PROPERTY_ID", prompt)
 
     def test_shared_evidence_keeps_property_conversations_isolated(self) -> None:

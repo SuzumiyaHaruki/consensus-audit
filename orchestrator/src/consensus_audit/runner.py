@@ -8,12 +8,13 @@ from typing import Any, Protocol
 
 from .artifacts import EventLog, create_run_directory, utc_now, write_json
 from .deepseek import ChatResponse
-from .evidence import write_evidence_manifest
+from .evidence import build_evidence_manifest, write_evidence_manifest
 from .materials import (
     MaterialSet,
     build_audit_prompt,
     build_baseline_prompt,
 )
+from .report import write_candidate_artifacts
 from .shared_context import SharedAuditContext
 from .workspace import SourceWorkspace
 
@@ -27,7 +28,7 @@ class ChatClient(Protocol):
 
 
 class AuditRunError(RuntimeError):
-    """Raised when an agent run cannot produce a final report."""
+    """Raised when an agent run cannot produce a final response."""
 
     def __init__(self, message: str, run_directory: Path | None = None):
         super().__init__(message)
@@ -36,24 +37,26 @@ class AuditRunError(RuntimeError):
 
 LATE_BUDGET_NOTICE = """\
 The investigation budget is nearly exhausted. If you can already name a
-provisional verdict and its decisive causal chain, use at most two additional
-source-tool calls total. Each must be a targeted attempt to falsify that
-verdict and must be capable of changing it. Do not spend remaining calls on
+provisional Candidate-v0 status and its decisive causal chain, use at most two
+additional source-tool calls total. Each must be a targeted attempt to falsify
+that result and must be capable of changing it. Do not spend remaining calls on
 general coverage, line-number collection, unavailable execution, or facts
-already inspected. Return the report immediately when those checks finish.
+already inspected. Return the Candidate-v0 JSON object immediately when those
+checks finish.
 """
 
 
-FINAL_REPORT_INSTRUCTION = """\
-This is the final report turn. No further source-tool calls are available.
-Using only the evidence already inspected, return the final Markdown report
-now and follow REPORT_TEMPLATE.md. Choose exactly one verdict:
-`credible_risk`, `no_credible_risk`, or `insufficient_evidence`.
+FINAL_CANDIDATE_INSTRUCTION = """\
+This is the final Candidate-v0 turn. No further source-tool calls are available.
+Using only the evidence already inspected, return exactly one JSON object now
+and follow REPORT_TEMPLATE.md. Choose exactly one status: `candidate_found`,
+`no_candidate`, or `insufficient_evidence`.
 
-Execution confirmation is not required for `credible_risk`; mark it as not
-confirmed by execution where appropriate. If essential evidence is missing,
-use `insufficient_evidence` and identify it. Do not request more checks or
-tools, and do not respond with a plan to write the report.
+Do not claim execution confirmation. If essential evidence is missing, use
+`insufficient_evidence` and identify it in `summary` and `uncertainties`. Do not
+request more checks or tools, return Markdown prose, respond with a plan, or
+emit tool-call syntax such as XML/DSML tags. The first output character must be
+`{` and the last must be `}`.
 """
 
 
@@ -92,11 +95,14 @@ class BaselineRunConfig:
 @dataclass(frozen=True)
 class RunResult:
     run_directory: Path
-    report: str | None
+    response: str | None
     usage: dict[str, int]
     turns: int
     tool_calls: int
     dry_run: bool
+    candidate_status: str | None
+    candidate_format_valid: bool | None
+    candidate_provenance_valid: bool | None
 
 
 def _add_usage(total: dict[str, int], current: dict[str, int]) -> None:
@@ -158,10 +164,10 @@ def run_baseline_episode(
     run_label = f"baseline-{config.episode:02d}"
     metadata = {
         "created_at": utc_now(),
-        "audit_mode": "unguided-baseline",
+        "audit_mode": "matched-no-property",
         "baseline_episode": config.episode,
         "material_set": material_set.name,
-        "material_files": list(material_set.relative_baseline_files),
+        "material_files": list(material_set.relative_common_files),
         "target_root": str(target_root),
         "allow_tests": config.allow_tests,
         "max_turns": config.max_turns,
@@ -203,21 +209,21 @@ def _run_prompt(
     user_prompt += (
         f"\nRUN BUDGET: at most {config.max_turns} model turns and "
         f"{config.max_tool_calls} source-tool calls. Reserve enough budget for "
-        "the final Markdown report. The final model turn is report-only and "
+        "the final Candidate-v0 JSON object. The final model turn is output-only and "
         "has no tools.\n"
     )
     if config.allow_tests:
         user_prompt += (
             "TOOL AVAILABILITY: source inspection and bounded existing Go tests "
             "are available. Arbitrary commands and new executable harnesses are "
-            "not available. Static evidence may still support `credible_risk`.\n"
+            "not available. Static evidence may still support `candidate_found`.\n"
         )
     else:
         user_prompt += (
             "TOOL AVAILABILITY: only source listing, reading, and search are "
             "available. Test execution, arbitrary commands, and executable "
             "harnesses are unavailable. Do not spend turns planning them. Static "
-            "evidence may support `credible_risk`; lack of execution alone does "
+            "evidence may support `candidate_found`; lack of execution alone does "
             "not require `insufficient_evidence`.\n"
         )
     run_directory = create_run_directory(config.run_root.resolve(), run_label)
@@ -231,7 +237,7 @@ def _run_prompt(
     if config.dry_run:
         events.append("dry_run_prepared")
         write_evidence_manifest(run_directory)
-        return RunResult(run_directory, None, {}, 0, 0, True)
+        return RunResult(run_directory, None, {}, 0, 0, True, None, None, None)
     if client is None:
         raise AuditRunError("a chat client is required unless dry_run is enabled")
     if config.max_turns <= 0:
@@ -250,21 +256,21 @@ def _run_prompt(
 
     try:
         for turn in range(1, config.max_turns + 1):
-            final_report_turn = turn == config.max_turns
-            if turn == config.max_turns - 2 and not final_report_turn:
+            final_output_turn = turn == config.max_turns
+            if turn == config.max_turns - 2 and not final_output_turn:
                 messages.append({"role": "user", "content": LATE_BUDGET_NOTICE})
                 events.append(
                     "budget_notice",
                     turn=turn,
                     remaining_turns=config.max_turns - turn + 1,
                 )
-            if final_report_turn:
+            if final_output_turn:
                 messages.append(
-                    {"role": "user", "content": FINAL_REPORT_INSTRUCTION}
+                    {"role": "user", "content": FINAL_CANDIDATE_INSTRUCTION}
                 )
-                events.append("final_report_turn", turn=turn, tools_enabled=False)
+                events.append("final_candidate_turn", turn=turn, tools_enabled=False)
 
-            request_tools = [] if final_report_turn else tools
+            request_tools = [] if final_output_turn else tools
             events.append(
                 "llm_request",
                 turn=turn,
@@ -287,9 +293,9 @@ def _run_prompt(
             )
 
             if response.tool_calls:
-                if final_report_turn:
+                if final_output_turn:
                     raise AuditRunError(
-                        "model requested tools during the final report turn"
+                        "model requested tools during the final Candidate-v0 turn"
                     )
                 messages.append(response.assistant_message())
                 for call in response.tool_calls:
@@ -336,11 +342,24 @@ def _run_prompt(
                     f"model returned no final content (finish_reason={response.finish_reason!r})"
                 )
 
-            raw_report = response.content.strip()
+            raw_candidate = response.content.strip()
             (run_directory / "response.md").write_text(
-                raw_report + "\n", encoding="utf-8"
+                raw_candidate + "\n", encoding="utf-8"
             )
-            write_evidence_manifest(run_directory)
+            evidence_manifest = build_evidence_manifest(run_directory)
+            write_json(run_directory / "evidence-manifest.json", evidence_manifest)
+            candidate_artifacts = write_candidate_artifacts(
+                run_directory,
+                raw_candidate,
+                target_root=target_root,
+                evidence_manifest=evidence_manifest,
+                audit_mode=str(metadata.get("audit_mode") or ""),
+                expected_property_id=(
+                    str(metadata["property_id"])
+                    if metadata.get("property_id") is not None
+                    else None
+                ),
+            )
             write_json(
                 run_directory / "summary.json",
                 {
@@ -350,16 +369,24 @@ def _run_prompt(
                     "tool_calls": tool_call_count,
                     "usage": total_usage,
                     "response_file": "response.md",
-                    "report_format": "markdown",
+                    "response_format": "candidate-v0-json",
+                    "candidate_status": candidate_artifacts.status,
+                    "candidate_format_valid": candidate_artifacts.format_valid,
+                    "candidate_provenance_valid": candidate_artifacts.provenance_valid,
+                    "parsed_candidate_file": candidate_artifacts.parsed_file,
+                    "source_cost": evidence_manifest.get("source_cost", {}),
                 },
             )
             return RunResult(
                 run_directory,
-                raw_report,
+                raw_candidate,
                 total_usage,
                 turn,
                 tool_call_count,
                 False,
+                candidate_artifacts.status,
+                candidate_artifacts.format_valid,
+                candidate_artifacts.provenance_valid,
             )
 
         raise AuditRunError(f"agent exceeded max_turns={config.max_turns}")

@@ -20,8 +20,6 @@ class MaterialTests(unittest.TestCase):
                 "Audit the selected property.", encoding="utf-8"
             )
             (root / "shared.md").write_text("shared boundary", encoding="utf-8")
-            (root / "baseline-task.md").write_text("unguided task", encoding="utf-8")
-            (root / "baseline-report.md").write_text("unguided report", encoding="utf-8")
             (root / "q1.md").write_text("Q-TEST-1 first property", encoding="utf-8")
             (root / "q2.md").write_text("Q-TEST-2 second property", encoding="utf-8")
             (root / "catalog.yaml").write_text(
@@ -30,13 +28,9 @@ material_sets:
   test-set:
     protocol: test
     target: target
-    shared_files:
+    common_files:
       - shared.md
-    guided_files:
       - task.md
-    baseline_files:
-      - baseline-task.md
-      - baseline-report.md
     properties:
       Q-TEST-1: q1.md
       Q-TEST-2: q2.md
@@ -65,11 +59,7 @@ material_sets:
                 """
 material_sets:
   bad:
-    shared_files:
-      - ../outside-material.md
-    guided_files:
-      - task.md
-    baseline_files:
+    common_files:
       - task.md
     properties:
       Q-TEST-1: ../outside-material.md
@@ -84,16 +74,15 @@ material_sets:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "shared.md").write_text("crash recovery model", encoding="utf-8")
-            (root / "guided.md").write_text("guided task", encoding="utf-8")
-            (root / "baseline.md").write_text("unguided task", encoding="utf-8")
+            (root / "task.md").write_text("shared candidate task", encoding="utf-8")
+            (root / "protocol.md").write_text("PROTOCOL_CONTEXT", encoding="utf-8")
+            (root / "events.md").write_text("EVENT_SEMANTICS", encoding="utf-8")
             (root / "property.md").write_text("Q-TEST-1", encoding="utf-8")
             (root / "catalog.yaml").write_text(
                 """
 material_sets:
   test:
-    shared_files: [shared.md]
-    guided_files: [guided.md]
-    baseline_files: [baseline.md]
+    common_files: [shared.md, task.md, protocol.md, events.md]
     properties:
       Q-TEST-1: property.md
 """.strip(),
@@ -105,12 +94,36 @@ material_sets:
             material_set = load_material_set(root, "test")
             _, user = build_baseline_prompt(material_set, target)
 
-            self.assertIn("AUDIT_MODE=unguided-baseline", user)
+            self.assertIn("AUDIT_MODE=matched-no-property", user)
+            self.assertIn("MATERIAL_SET=test", user)
             self.assertIn("crash recovery model", user)
+            self.assertIn("Do not choose one in advance", user)
+            self.assertIn("Once such a mechanism emerges", user)
             self.assertNotIn("TARGET_PROPERTY_ID", user)
-            self.assertNotIn("EVENT_SEMANTICS", user)
-            self.assertNotIn("PROTOCOL_CONTEXT", user)
-            self.assertNotIn("Majority(C)", user)
+            self.assertIn("EVENT_SEMANTICS", user)
+            self.assertIn("PROTOCOL_CONTEXT", user)
+
+    def test_baseline_and_guided_share_every_non_property_material(self) -> None:
+        project = Path(__file__).resolve().parents[2]
+        material_set = load_material_set(project / "audit-specs", "raft-etcd-v1")
+
+        self.assertEqual(
+            material_set.relative_common_files,
+            material_set.relative_paths(material_set.common_files),
+        )
+        guided_system, guided_user = build_audit_prompt(
+            material_set, project, "Q-VOTE-1"
+        )
+        baseline_system, baseline_user = build_baseline_prompt(material_set, project)
+        self.assertEqual(guided_system, baseline_system)
+        for path in material_set.common_files:
+            content = path.read_text(encoding="utf-8").strip()
+            self.assertIn(content, guided_user)
+            self.assertIn(content, baseline_user)
+        self.assertNotIn(
+            material_set.property_file("Q-VOTE-1").read_text(encoding="utf-8").strip(),
+            baseline_user,
+        )
 
 
 if __name__ == "__main__":

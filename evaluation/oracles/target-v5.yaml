@@ -1,0 +1,27 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v5
+label: mutant
+primary_property: Q-LOG-1
+valid_related_properties: [Q-LOG-2]
+ground_truth_mechanism:
+  mechanism_id: batched-proposal-reuses-existing-tail-index
+  anchor_regions:
+    - path: raft.go
+      symbol: raft.appendEntry
+      line_hint: 815
+  violated_obligation: A leader must append new entries after its current logical tail without replacing entries created during the same leadership interval.
+  decisive_relation: >-
+    When a multi-entry proposal follows an uncommitted payload, decrementing the
+    current last index assigns the first new entry to the existing tail index and
+    causes append to truncate or replace that tail.
+  accepted_equivalent_explanations:
+    - li-- makes a batch start at lastIndex rather than lastIndex+1.
+    - A second batched proposal overwrites the leader's earlier uncommitted entry.
+  incorrect_but_related_explanations:
+    - Followers are always allowed to overwrite committed entries.
+    - Proposal entries are missing the current term.
+scenario_requirements:
+  precondition: Leader has one nonempty uncommitted entry, then receives a batch of at least two proposals.
+  decisive_actions: Append the first proposal, then append the batch in the same leadership interval.
+  violation: The leader replaces or deletes its existing entry at the reused index.
+  oracle: Compare the leader's logical log at that index before and after the batch.

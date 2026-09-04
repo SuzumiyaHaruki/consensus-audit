@@ -64,12 +64,12 @@ class CliTests(unittest.TestCase):
                 _selected_property_ids(args, DummyMaterialSet()), ["Q-A", "Q-C"]
             )
 
-    def test_baseline_defaults_to_material_property_count(self) -> None:
+    def test_baseline_defaults_to_one_top_candidate_episode(self) -> None:
         args = build_parser().parse_args(
             ["baseline", "--target-root", ".", "--dry-run"]
         )
         self.assertIsNone(args.episodes)
-        self.assertEqual(_baseline_episode_count(args, DummyMaterialSet()), 3)
+        self.assertEqual(_baseline_episode_count(args, DummyMaterialSet()), 1)
         self.assertEqual(args.max_turns, 24)
         self.assertEqual(args.max_tool_calls, 80)
 

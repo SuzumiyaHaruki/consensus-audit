@@ -1,0 +1,29 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v4
+label: mutant
+primary_property: Q-LEADER-1
+valid_related_properties: [Q-STATE-1]
+ground_truth_mechanism:
+  mechanism_id: vote-freshness-compares-committed-prefix-only
+  anchor_regions:
+    - path: log.go
+      symbol: raftLog.isUpToDate
+      line_hint: 440
+    - path: raft.go
+      symbol: raft.Step
+      role: vote-request freshness check
+  violated_obligation: A voter must reject a candidate whose full log is less up to date than the voter's full log.
+  decisive_relation: >-
+    The voter replaces its last-entry comparison point with its local committed
+    point, ignoring an unannounced but already quorum-replicated entry in its log.
+  accepted_equivalent_explanations:
+    - isUpToDate compares the candidate against committed rather than lastEntryID.
+    - A follower holding a committed entry can vote for a candidate missing it because its commit index lags.
+  incorrect_but_related_explanations:
+    - Commit index must always equal last index.
+    - The candidate advertises the wrong last log term.
+scenario_requirements:
+  precondition: One follower stores an entry committed by the old leader but has not received the commit notification.
+  decisive_actions: Old leader fails; a candidate missing the entry requests that follower's vote and wins.
+  violation: A newly elected leader lacks an entry committed before its election.
+  oracle: Observe election completion and compare the leader log with the previously committed entry.

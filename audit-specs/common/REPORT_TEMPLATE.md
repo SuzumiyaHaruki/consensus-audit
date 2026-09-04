@@ -1,57 +1,45 @@
-# Consensus Property Audit Report
+# Candidate-v0 Output Contract
 
-- Target root: `<TARGET_ROOT>`
-- Property: `<TARGET_PROPERTY_ID>`
-- Verdict: `credible_risk | no_credible_risk | insufficient_evidence`
+Return one JSON object and no surrounding prose or Markdown fence:
 
-## Scope
+```json
+{
+  "status": "candidate_found",
+  "property_id": "Q-EXAMPLE-1",
+  "property_statement": "A precise statement of the selected or derived property.",
+  "summary": "A short description of the candidate and its principal limitation.",
+  "source_evidence": [
+    {
+      "path": "relative/source.go",
+      "start_line": 10,
+      "end_line": 25,
+      "claim": "What executable behavior this inspected range establishes."
+    }
+  ],
+  "mechanism": {
+    "violated_obligation": "The implementation obligation derived from the property.",
+    "decisive_relation": "The decisive ordering, guard, threshold, or state relation that may break the obligation."
+  },
+  "causal_chain": [
+    "First implementation-level event.",
+    "Decisive transition or fault.",
+    "Minimal property contradiction."
+  ],
+  "test_sketch": {
+    "precondition": "P: concrete topology, state, participants, and required setup.",
+    "actions": [
+      "A1: first message, timeout, persistence, or crash action.",
+      "A2: next action."
+    ],
+    "violation": "V: the minimal event or predicate that negates the property.",
+    "oracle": "O: exact externally observable condition for detecting V."
+  },
+  "uncertainties": [
+    "A condition required by the scenario but not established by inspected source."
+  ]
+}
+```
 
-Describe the inspected implementation boundary and active configurations.
+For `property-directed`, `property_id` must equal the selected property ID. For `matched-no-property`, it must be `null`; use `property_statement` for the self-derived obligation.
 
-## Summary
-
-State the evidence-based conclusion and its main limitations.
-
-## Path coverage
-
-List every public interface and configuration branch that can affect the selected property. Identify which stages are shared and which are branch-specific.
-
-| Interface / mode | Inspected | Shared path | Branch-specific behavior | Conclusion |
-|---|---|---|---|---|
-
-## Search record
-
-- Concepts and symbols searched:
-- Files examined:
-- Checks or tests run:
-- Unresolved paths:
-
-## Findings
-
-Write `None` when no candidate meets the credible-risk standard. Otherwise, for each finding include:
-
-### `<finding ID>: <title>`
-
-- Draft candidate ID:
-- Target property:
-- Possible downstream implications: `unverified | none`
-- Confidence:
-- Classification: `library_defect | integration_risk | configuration_dependent | unresolved`
-- Source evidence:
-- Expected implementation obligation:
-- Risk mechanism:
-- Ordered causal chain:
-- Protocol precondition:
-- Implementation precondition:
-- Environment requirements:
-- Concrete scenario, node count, participants, target-property quorum (or `none`), setup-only quorums, and size justification:
-- Action or fault sequence `A`:
-- Semantic violation event or predicate `V`:
-- Observable oracle `O`:
-- Validation plan:
-- Uncertainties:
-- Confirmed by execution: `yes | no`
-
-## Limitations
-
-List assumptions, excluded behavior, and evidence that was unavailable.
+For `no_candidate` or `insufficient_evidence`, keep the same top-level keys but use an empty `source_evidence` list when there is no claim to support, set `mechanism` and `test_sketch` to `null`, use an empty `causal_chain`, and explain the result in `summary` and `uncertainties`.

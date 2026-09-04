@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
 .venv/
-runs/
-
+runs/*
+!runs/m6-candidate-v0/
+!runs/m6-candidate-v0/**

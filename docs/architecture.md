@@ -1,126 +1,72 @@
-# 目录与材料分层设计
+# 当前架构与边界
 
 ## 目标
 
-系统最终需要支持多种协议、多个实现、不同故障模型和多轮实验，同时保持以下边界：
-
-- 协议性质不与具体代码实现耦合；
-- 同一故障模型可以被多个协议复用；
-- 同一协议可以审计多个目标实现；
-- AI 可见材料与隐藏评价答案物理隔离；
-- 静态分析、TLA+ 可达性、真实执行和结果评价可以独立演进。
-
-## 审计定义组合
+当前系统是共识测试的审计前端：在有限预算内，把实现源码和协议知识转化为一个有代码依据的测试候选。它不证明缺陷、场景可达性或实现整体正确性，也不生成可直接执行的测试程序。
 
 ```text
-Shared fault model
-    + Shared target boundary
-    + Guided or baseline task
-    + Guided protocol/event/property package when applicable
-    + Report template
-    = Material set for one audit run
+实现源码 + 协议材料 + 故障模型 + 可选目标性质
+→ LLM源码搜索
+→ Candidate-v0
+→ 格式和引用来源校验
+→ 隐藏mechanism oracle人工评分
 ```
 
-### Common
+## 输入材料
 
-定义跨协议稳定的任务语义，例如证据要求、Risk/P/A/V/O、盲测规则和输出格式。这里不能出现 Raft、PBFT 或具体代码符号。
+`audit-specs/catalog.yaml` 只列出允许进入模型上下文的材料。每个 material set 具有：
 
-### Fault model
+- `common_files`：故障模型、目标边界、共同任务、协议上下文、事件完成语义和 Candidate-v0 输出契约；
+- `properties`：只能由 property-directed 条件逐个选择的性质文件。
 
-定义节点、网络、存储和活性假设。故障模型描述的是故障类型和故障后的语义，不定义协议的 quorum 算法、成员数量或具体部署能容忍多少故障。后面这些信息由协议和目标实验配置提供。
-
-故障模型独立于某个目标实现，例如：
+两个主实验条件的共同输入完全相同：
 
 ```text
-crash-stop-cft
-crash-recovery-cft
-byzantine-partial-synchrony
-storage-crash-consistency
+property-directed   = common_files + one Q
+matched-no-property = common_files
 ```
 
-只有实际实验需要时才增加，不提前复制相似版本。
+因此处理变量是是否给出具体性质，而不是协议背景、完成语义、报告格式或源码工具。property-directed 从给定性质向实现义务和代码机制推进；matched-no-property 不预先选择性质，而是先检查协议相关代码，在形成具体机制后再表述或修正它所威胁的性质与实现义务，并将 `property_id` 设为 `null`。
 
-### Protocol
+## 协议、故障模型与目标边界
 
-保存独立于实现的性质 Q 和必要协议记号。未来可以增加：
+协议层保存独立于实现的性质、记号和事件完成语义，不出现具体代码符号。故障模型定义节点、网络、存储和恢复假设，不预先固定协议 quorum。目标边界说明本次允许分析的接口与配置，但不包含 mutation 身份或正确答案。
 
-```text
-protocols/raft
-protocols/pbft
-protocols/hotstuff
-protocols/tendermint
-```
+新增协议或实现时增加相应的 protocol/target 材料集，不复制通用任务和输出契约。
 
-协议层不得标注某个目标实现的文件、函数或字段。
+## 运行与 Candidate-v0
 
-每个性质保存为独立文件，共享协议记号放在 `PROTOCOL_CONTEXT.md`，事件完成语义放在 `EVENT_SEMANTICS.md`。批量审计时，运行器只装入当前 Q，不把同批次的其他性质定义、reasoning 或结果带入该上下文。
+每次运行使用独立消息上下文，最多输出一个主 Candidate。模型应先找到代码锚点和被破坏的实现义务，再给出决定性 ordering、guard、threshold 或 state relation，最后展开最小因果链和自然语言 P/A/V/O。
 
-几十个性质由外层 orchestrator 顺序调度，而不是要求单个 LLM上下文同时承载。默认隔离策略优先保证结论可归因；相关性质之间重复搜索代码的成本，后续可以通过不含语义结论的机械代码索引降低。
+`candidate_found` 只表示模型认为存在值得交给下游测试的机制；真正的 `test-worthy` 由评价器判定。`no_candidate` 表示本轮和预算内没有候选，不是正确性证明。`insufficient_evidence` 表示决定性代码或完成语义不可得。
 
-### Target
+## 机械校验
 
-定义一个具体实现的系统边界、公开契约和启用配置。`TARGET_BOUNDARY.md` 由性质审计与 baseline 共享，只说明“本次审计什么”，不提供正确 quorum 公式、事件语义或性质答案。
+Runner 保留原始 `response.md`，然后执行两类不涉及机制语义的检查：
 
-除非研究对象就是某个固定部署，静态分析阶段不预设节点数。quorum 和成员规模应保持参数化；AI在把风险转成具体 P/A/V/O 场景时自行选择节点数量、参与者和所需 quorum，并解释为什么这个规模能够暴露风险。
+1. Candidate-v0 是否为单个 JSON 对象且满足字段契约；
+2. 每个源码路径是否存在，引用行区间是否完全落在本轮 `read_file` 返回的区间内。
 
-同一协议的其他实现应作为并列目录加入，例如：
+通过后生成 `parsed-candidate.json`。provenance 通过只说明模型实际读取了相应代码，不能说明自然语言 claim 或机制结论正确。
 
-```text
-protocols/raft/targets/hashicorp-raft
-protocols/raft/targets/redisraft
-```
-
-## 实现路径发现策略
-
-主实验的 AI 可见材料不应直接列出某个实现已知存在几条路径，也不应给出接口与配置的笛卡尔积。例如，即使人工已经知道一个目标存在两类接口和两种存储模式，也只要求 AI：
-
-```text
-发现所有与性质相关的公开入口和配置分支
-→ 判断哪些阶段共享代码、哪些阶段真正分叉
-→ 说明为什么没有遗漏实质不同的路径
-```
-
-已知路径矩阵作为隐藏评价知识由人工保留。若主实验遗漏某条路径，可以另做一次显式提供路径清单的诊断运行：显式清单下能够正确分析，说明主要问题在路径发现；仍然不能正确分析，说明问题在路径内的语义推理。诊断运行不能与无提示主实验混为同一种能力结论。
-
-## 非 AI 输入组件
-
-这些框架组件不应放入 `audit-specs`：
-
-```text
-orchestrator/       已实现：材料装配、模型调用、源码工具循环和运行预算
-analyzers/          符号索引、调用关系和代码切片工具
-models/             TLA+ 或其他协议模型
-executors/          消息、时间、生命周期和状态控制
-evaluators/         报告评分、Oracle 和统计
-runs/               单次实验的配置与结果引用
-```
-
-除已实现的 `orchestrator` 外，其余目录在真正出现代码或数据前不创建空壳。
+纯 JSON 是首选格式。为了不让可恢复的展示差异覆盖机制发现结果，解析器也接受外围说明文字中唯一的有效 JSON 代码块，并记录格式警告；多个候选对象、无法解析的文本和只有工具调用语法的输出不会被猜测性修复。
 
 ## 隐藏评价材料
 
-人工植入缺陷的根因、修改位置、正确因果链和预期场景不能依靠目录命名约定来保密。它们应存放在 AI运行环境无法读取的位置，或由外部评价服务持有。
+`evaluation/oracles` 保存人工注入机制的语义 oracle，不属于 AI 材料。Runner 不读取它，模型工具也被限制在 `TARGET_ROOT`。正式实验环境仍需确保评价目录不作为目标代码或附加材料暴露。
 
-AI只应获得：
+oracle 以决定性关系为核心，同时记录 anchor、实现义务、可接受的语义等价解释和错误但相关的解释。命中同一机制的多个性质报告只算一个独立发现。
 
-```text
-解析后的material set
-+ 当前被测工作树
-+ 明确允许的分析工具
-```
+## shared-evidence
 
-不应获得框架工作区的完整读取权限。
+`shared-evidence` 保留为可选消融：它在隔离推理上下文之间共享机械索引和完全相同的原始工具结果，不共享结论。当前主实验使用 `isolated`，因为已有试运行尚未显示足够的实际证据复用收益。
 
-## Material set
+## 当前不实现
 
-`audit-specs/catalog.yaml` 是装配入口。每个 material set 明确列出 AI必须读取的文件，避免随着协议和目标增加而把无关材料全部送入上下文。
+- 自动判断机制与 oracle 的语义等价；
+- 多 Candidate 合并和跨性质结论记忆；
+- TLA+ 可达性证明；
+- 自动生成、部署或执行场景；
+- 对整个实现的完备性质证明。
 
-每个 material set 将文件分成 `shared_files`、`guided_files` 和 `baseline_files`。两种审计都读取 shared fault model 与 target boundary；性质审计另外读取 protocol context、event semantics 和当前 Q；baseline 只读取 baseline task 与报告格式。baseline 未显式指定 episode 数时，使用该 material set 的性质数量。
-
-material set 只描述组合关系，不保存代码版本、mutation 身份、正确答案或历史结果。
-
-## Candidate 与 Case
-
-单 Q分析报告中的每个可信风险先形成 `Candidate IR`，保留原始报告和工具证据引用。相关 Q产生的同根风险在分析完成后可以合并为一个 `Case IR`。
-
-Candidate 是未经审查的风险假设；Case 是供 TLA+、场景规划器和执行器消费的规范化对象。两者的定义位于顶层 `ir/`，不属于 AI输入。Case将 `P`拆为协议、实现和环境三类谓词，同时保存动作集/序列 `A`、性质违例 `V` 和 Oracle `O`。
+只有下游测试消费者真实建立后，才根据其输入需求设计 Case 或可执行场景 DSL。

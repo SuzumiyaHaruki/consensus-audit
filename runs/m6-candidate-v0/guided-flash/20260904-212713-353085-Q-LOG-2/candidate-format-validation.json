@@ -1,0 +1,12 @@
+{
+  "schema_version": "candidate-format-validation/v1",
+  "generated_at": "2026-09-04T13:39:36.721947+00:00",
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    "extracted the unique JSON object from a code fence",
+    "ignored surrounding prose outside the JSON code fence"
+  ],
+  "audit_mode": "property-directed",
+  "expected_property_id": "Q-LOG-2"
+}

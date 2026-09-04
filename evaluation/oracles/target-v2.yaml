@@ -1,0 +1,26 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v2
+label: mutant
+primary_property: Q-ELECT-1
+valid_related_properties: []
+ground_truth_mechanism:
+  mechanism_id: even-membership-quorum-rounded-down
+  anchor_regions:
+    - path: quorum/majority.go
+      symbol: MajorityConfig.VoteResult
+      line_hint: 188
+  violated_obligation: A winning vote set must contain strictly more than half of a fixed voter set.
+  decisive_relation: >-
+    The threshold (len(C)+1)/2 equals half rather than half plus one for even C,
+    allowing two disjoint half-sized sets to both win.
+  accepted_equivalent_explanations:
+    - Four voters incorrectly require two votes instead of three.
+    - Integer division rounds the even-sized majority threshold down.
+  incorrect_but_related_explanations:
+    - A voter can vote twice.
+    - Joint-consensus quorum intersection is missing.
+scenario_requirements:
+  precondition: Four fixed voters partitioned into two disjoint pairs.
+  decisive_actions: Two candidates each collect one pair under the same term.
+  violation: Two distinct candidates complete election in the same term and voter set.
+  oracle: Observe both candidates enter leader state for that term.

@@ -1,0 +1,29 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v3
+label: mutant
+primary_property: Q-TERM-1
+valid_related_properties: [Q-VOTE-1, Q-ELECT-1]
+ground_truth_mechanism:
+  mechanism_id: candidate-accepts-lower-term-append
+  anchor_regions:
+    - path: raft.go
+      symbol: raft.Step
+      line_hint: 1125
+    - path: raft.go
+      symbol: stepCandidate
+      line_hint: 1682
+  violated_obligation: A node that has durably advanced to term T must not later act in a lower term.
+  decisive_relation: >-
+    A special break bypasses rejection of a T-1 MsgApp, after which stepCandidate
+    calls becomeFollower with the lower message term and decreases the node term.
+  accepted_equivalent_explanations:
+    - The top-level lower-term guard is bypassed for a candidate and delayed AppendEntries.
+    - stepCandidate relies on m.Term equaling r.Term, but the new branch violates that precondition.
+  incorrect_but_related_explanations:
+    - The candidate steps down on a valid same-term leader message.
+    - A higher-term message increments the term too far.
+scenario_requirements:
+  precondition: CheckQuorum disabled; candidate at durable term T; delayed MsgApp from T-1.
+  decisive_actions: Deliver the stale MsgApp through the bypass into stepCandidate.
+  violation: The node completes a lower-term action after DurableTerm(T).
+  oracle: Observe the node term or subsequent emitted action use T-1.

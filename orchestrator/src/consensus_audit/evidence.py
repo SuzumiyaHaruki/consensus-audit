@@ -192,6 +192,11 @@ def build_evidence_manifest(run_directory: Path) -> dict[str, Any]:
         }
         for path, lines in sorted(search_lines.items())
     ]
+    unique_source_lines_read = sum(
+        item["end"] - item["start"] + 1
+        for file_entry in files_read
+        for item in file_entry["ranges"]
+    )
 
     return {
         "schema_version": "evidence-manifest/v1",
@@ -216,6 +221,11 @@ def build_evidence_manifest(run_directory: Path) -> dict[str, Any]:
             "read": files_read,
             "matched_by_search": files_matched,
             "search_only": sorted(path for path in search_lines if path not in read_ranges),
+        },
+        "source_cost": {
+            "files_read": len(files_read),
+            "unique_source_lines_read": unique_source_lines_read,
+            "search_calls": len(searches),
         },
         "searches": searches,
         "list_operations": list_operations,

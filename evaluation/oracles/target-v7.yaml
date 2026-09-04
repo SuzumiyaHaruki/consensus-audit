@@ -1,0 +1,29 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v7
+label: mutant
+primary_property: Q-STATE-1
+valid_related_properties: []
+ground_truth_mechanism:
+  mechanism_id: heartbeat-commits-unmatched-local-tail
+  anchor_regions:
+    - path: raft.go
+      symbol: raft.handleHeartbeat
+      line_hint: 1830
+    - path: raft.go
+      symbol: raft.sendHeartbeat
+      role: leader-side commit bound
+  violated_obligation: A follower may apply an index only after the leader has established that the follower's entry at that index matches the committed log.
+  decisive_relation: >-
+    If the follower has a sufficiently long local tail, handleHeartbeat advances
+    two indexes beyond the leader-provided commit bound, committing unmatched old entries.
+  accepted_equivalent_explanations:
+    - The follower derives commit progress from lastIndex rather than respecting m.Commit.
+    - A heartbeat carrying Commit=0 can make a divergent follower apply its local entry at index 2.
+  incorrect_but_related_explanations:
+    - The leader always sends its full committed index to every follower.
+    - Heartbeats are forbidden from advancing commit under any circumstances.
+scenario_requirements:
+  precondition: Divergent follower has at least three old local entries while leader match for it is zero and a different index-2 value is committed elsewhere.
+  decisive_actions: Deliver the higher-term heartbeat before repairing the follower log.
+  violation: Different nonempty commands are applied at the same index by two nodes.
+  oracle: Observe or log Applied(node, index, value) for both conflicting values.

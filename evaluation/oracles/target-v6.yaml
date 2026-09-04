@@ -1,0 +1,30 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v6
+label: mutant
+primary_property: Q-LOG-2
+valid_related_properties: []
+ground_truth_mechanism:
+  mechanism_id: empty-overlap-skips-conflict-check
+  anchor_regions:
+    - path: log.go
+      symbol: raftLog.maybeAppend
+      line_hint: 115
+    - path: log.go
+      symbol: raftLog.findConflict
+      role: bypassed first-entry comparison
+  violated_obligation: Matching entries at a later index and term must imply identical preceding log prefixes.
+  decisive_relation: >-
+    The fast path skips conflict comparison for an empty incoming entry at the
+    follower tail based on payload and index alone, ignoring a term mismatch and
+    retaining the follower's conflicting predecessor.
+  accepted_equivalent_explanations:
+    - Empty Data does not make two entries identical; the skipped entry term still matters.
+    - findConflict starts from the second entry, so index 1 can remain divergent while index 2 matches.
+  incorrect_but_related_explanations:
+    - Empty no-op entries should never be replicated.
+    - The follower rejects every overlapping AppendEntries request.
+scenario_requirements:
+  precondition: Follower tail and incoming first entry share an index but differ in term; incoming entry is empty and followed by nonempty data.
+  decisive_actions: Deliver both incoming entries in one append request so the first comparison is skipped.
+  violation: Leader and follower share a later term/index entry but have different preceding prefixes.
+  oracle: Inspect both logical logs and compare the prefix preceding the shared later entry.

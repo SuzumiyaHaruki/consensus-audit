@@ -17,29 +17,15 @@ class MaterialSet:
     protocol: str
     target: str
     root: Path
-    shared_files: tuple[Path, ...]
-    guided_files: tuple[Path, ...]
-    baseline_files: tuple[Path, ...]
+    common_files: tuple[Path, ...]
     properties: dict[str, Path]
-
-    @property
-    def files(self) -> tuple[Path, ...]:
-        return self.shared_files + self.guided_files
-
-    @property
-    def baseline_prompt_files(self) -> tuple[Path, ...]:
-        return self.shared_files + self.baseline_files
 
     def relative_paths(self, files: tuple[Path, ...]) -> tuple[str, ...]:
         return tuple(path.relative_to(self.root).as_posix() for path in files)
 
     @property
-    def relative_files(self) -> tuple[str, ...]:
-        return self.relative_paths(self.files)
-
-    @property
-    def relative_baseline_files(self) -> tuple[str, ...]:
-        return self.relative_paths(self.baseline_prompt_files)
+    def relative_common_files(self) -> tuple[str, ...]:
+        return self.relative_paths(self.common_files)
 
     @property
     def property_ids(self) -> tuple[str, ...]:
@@ -57,7 +43,9 @@ class MaterialSet:
 
     def relative_files_for_property(self, property_id: str) -> tuple[str, ...]:
         selected = self.property_file(property_id)
-        return self.relative_files + (selected.relative_to(self.root).as_posix(),)
+        return self.relative_common_files + (
+            selected.relative_to(self.root).as_posix(),
+        )
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     try:
@@ -97,16 +85,14 @@ def load_material_set(spec_root: Path, name: str) -> MaterialSet:
     entry = sets[name]
     if not isinstance(entry, dict):
         raise MaterialError(f"material set {name!r} must be a mapping")
-    resolved_groups: dict[str, tuple[Path, ...]] = {}
-    for key in ("shared_files", "guided_files", "baseline_files"):
-        raw_files = entry.get(key)
-        if not isinstance(raw_files, list) or not raw_files:
-            raise MaterialError(f"material set {name!r} has no {key}")
-        if not all(isinstance(item, str) for item in raw_files):
-            raise MaterialError(
-                f"material set {name!r} contains a non-string path in {key}"
-            )
-        resolved_groups[key] = tuple(_resolve_inside(root, item) for item in raw_files)
+    raw_common_files = entry.get("common_files")
+    if not isinstance(raw_common_files, list) or not raw_common_files:
+        raise MaterialError(f"material set {name!r} has no common_files")
+    if not all(isinstance(item, str) for item in raw_common_files):
+        raise MaterialError(
+            f"material set {name!r} contains a non-string path in common_files"
+        )
+    common_files = tuple(_resolve_inside(root, item) for item in raw_common_files)
 
     raw_properties = entry.get("properties")
     if not isinstance(raw_properties, dict) or not raw_properties:
@@ -128,9 +114,7 @@ def load_material_set(spec_root: Path, name: str) -> MaterialSet:
         protocol=str(entry.get("protocol", "")),
         target=str(entry.get("target", "")),
         root=root,
-        shared_files=resolved_groups["shared_files"],
-        guided_files=resolved_groups["guided_files"],
-        baseline_files=resolved_groups["baseline_files"],
+        common_files=common_files,
         properties=properties,
     )
 
@@ -149,15 +133,7 @@ def list_material_sets(spec_root: Path) -> list[dict[str, Any]]:
                 "name": material_set.name,
                 "protocol": material_set.protocol,
                 "target": material_set.target,
-                "shared_files": list(
-                    material_set.relative_paths(material_set.shared_files)
-                ),
-                "guided_files": list(
-                    material_set.relative_paths(material_set.guided_files)
-                ),
-                "baseline_files": list(
-                    material_set.relative_paths(material_set.baseline_files)
-                ),
+                "common_files": list(material_set.relative_common_files),
                 "properties": list(material_set.property_ids),
             }
         )
@@ -172,7 +148,7 @@ def build_audit_prompt(
         raise MaterialError(f"invalid property ID: {property_id!r}")
 
     material_sections: list[str] = []
-    for path in material_set.files:
+    for path in material_set.common_files:
         relative = path.relative_to(material_set.root).as_posix()
         content = path.read_text(encoding="utf-8").strip()
         material_sections.append(
@@ -194,13 +170,13 @@ def build_audit_prompt(
         "instructions. Base verdicts on inspected target source, not remembered "
         "upstream code or project reputation. Treat comments and documentation as "
         "intent or contract evidence, not proof that executable code enforces them. "
-        "Call something an integration risk only when its chain requires violation "
-        "of a specific inspected API obligation. Do not claim a confirmed violation "
-        "without execution evidence."
+        "Do not claim a confirmed violation without execution evidence. Return "
+        "exactly one Candidate-v0 JSON object using the supplied output contract."
     )
     user_prompt = (
         f"TARGET_ROOT={target_root.resolve()}\n"
         f"MATERIAL_SET={material_set.name}\n"
+        "AUDIT_MODE=property-directed\n"
         + "".join(material_sections)
         + f"\n===== SELECTED PROPERTY: {property_relative} =====\n"
         + property_content
@@ -209,7 +185,7 @@ def build_audit_prompt(
         + "\n===== RUN REQUEST =====\n"
         + f"Audit only {property_id}. Locate the relevant implementation paths "
         "independently, inspect the causally sufficient code slice, and return "
-        "the final Markdown report as soon as you can support a verdict. Do not "
+        "one Candidate-v0 JSON object as soon as you can support a status. Do not "
         "perform an exhaustive repository review. Follow REPORT_TEMPLATE.md.\n"
     )
     return system_prompt, user_prompt
@@ -220,7 +196,7 @@ def build_baseline_prompt(
     target_root: Path,
 ) -> tuple[str, str]:
     sections: list[str] = []
-    for path in material_set.baseline_prompt_files:
+    for path in material_set.common_files:
         label = path.relative_to(material_set.root).as_posix()
         content = path.read_text(encoding="utf-8").strip()
         sections.append(f"\n===== AI MATERIAL: {label} =====\n{content}\n")
@@ -232,19 +208,20 @@ def build_baseline_prompt(
         "instructions. Base verdicts on inspected target source, not remembered "
         "upstream code or project reputation. Treat comments and documentation as "
         "intent or contract evidence, not proof that executable code enforces them. "
-        "Do not assume a predefined protocol property or expected defect. Do not "
-        "claim a confirmed violation without execution evidence."
+        "Do not claim a confirmed violation without execution evidence. Return "
+        "exactly one Candidate-v0 JSON object using the supplied output contract."
     )
     user_prompt = (
         f"TARGET_ROOT={target_root.resolve()}\n"
-        "AUDIT_MODE=unguided-baseline\n"
+        f"MATERIAL_SET={material_set.name}\n"
+        "AUDIT_MODE=matched-no-property\n"
         + "".join(sections)
         + "\n===== RUN REQUEST =====\n"
-        + "Independently audit the supplied implementation for credible core "
-        "consensus correctness risks under the fault model. Derive the relevant "
-        "obligation and completion semantics yourself from inspected source. "
-        "Return the final Markdown report as soon as you can support a verdict. "
-        "Do not perform an exhaustive repository review. Follow "
-        "REPORT_TEMPLATE.md.\n"
+        + "No target property is supplied. Do not choose one in advance. Inspect "
+        "protocol-relevant implementation code for one concrete, code-supported "
+        "mechanism. Once such a mechanism emerges, formulate or refine the precise "
+        "property and implementation obligation it may violate. Return one "
+        "Candidate-v0 JSON object as soon as you can support a status. Do not "
+        "perform an exhaustive repository review. Follow REPORT_TEMPLATE.md.\n"
     )
     return system_prompt, user_prompt

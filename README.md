@@ -1,6 +1,6 @@
-# 共识实现性质审计框架
+# 共识实现测试候选发现框架
 
-本项目用于研究“AI 根据协议性质审计具体共识实现，并提出可验证违例场景”。目前以 Raft 和 `etcd/raft` 进行首轮实验，但框架不绑定单一协议、实现或模型服务。
+本项目研究：给定共识实现、协议材料、故障模型和可选的目标性质，LLM 能否以较低成本提出少量、源码支撑充分、值得进入后续测试的协议违例候选场景。Candidate 是面向测试的假设，不是已确认缺陷或可达性证明。
 
 ## 当前结构
 
@@ -9,21 +9,20 @@ consensus-audit/
 ├── README.md                         # 人类使用说明（不提供给 AI）
 ├── docs/
 │   └── architecture.md               # 总体分层和扩展约定
+├── evaluation/
+│   ├── oracles/                       # 不提供给模型的人工机制标注
+│   └── score-template.csv             # Candidate人工评分表
 ├── ir/
-│   ├── README.md                     # Candidate/Case职责和下游消费边界
-│   └── templates/                    # 最小、可修改的YAML草案
+│   └── README.md                      # Candidate-v0边界和后续阶段
 ├── orchestrator/
-│   ├── src/consensus_audit/           # 材料装配、LLM工具循环和产物记录
+│   ├── src/consensus_audit/           # 材料装配、工具循环、解析和证据校验
 │   └── tests/                         # 不访问外部API的离线测试
 ├── pyproject.toml
 └── audit-specs/                      # 可组合的审计定义
     ├── catalog.yaml                  # 材料组合清单，由实验运行器读取
-    ├── baseline/                     # 无性质对照任务和报告格式
-    │   ├── AUDIT_TASK.md
-    │   └── REPORT_TEMPLATE.md
     ├── common/
-    │   ├── AUDIT_TASK.md             # 跨协议通用审计任务
-    │   └── REPORT_TEMPLATE.md        # 统一Markdown报告格式
+    │   ├── AUDIT_TASK.md             # 两个实验条件共用的发现任务
+    │   └── REPORT_TEMPLATE.md        # Candidate-v0 JSON契约
     ├── fault-models/
     │   └── crash-recovery-cft.md     # 可复用故障模型
     └── protocols/
@@ -41,11 +40,12 @@ consensus-audit/
 
 ## 材料组合
 
-一次实验不应把整个 `audit-specs` 目录都交给 AI。运行器根据 `catalog.yaml` 组合共享材料与当前审计分支的专属材料。
+一次实验不把整个 `audit-specs` 目录交给 AI。运行器根据 `catalog.yaml` 装配共同材料，性质侧再额外加入一个 Q：
 
 ```text
-性质审计 = shared fault model + shared target boundary + guided task + protocol context + event semantics + one Q + guided report template
-baseline = shared fault model + shared target boundary + baseline task + baseline report template
+共同材料 = fault model + target boundary + task + protocol context + event semantics + Candidate-v0 contract
+property-directed = 共同材料 + one Q
+matched-no-property = 共同材料
 ```
 
 当前材料集为 `raft-etcd-v1`。推荐每次只指定一个性质，例如 `Q-VOTE-1`，并为每个代码版本创建全新上下文。
@@ -54,11 +54,11 @@ baseline = shared fault model + shared target boundary + baseline task + baselin
 
 当需要减少重复源码探索时，可指定 `--context-mode shared-evidence`。该模式仍为每个 Q 创建全新的模型消息上下文，但在批次目录中一次性建立机械的文件/Go 声明索引，并在各 Q 之间复用完全相同的原始 `list_files`、`search_code`、`read_file` 工具结果。索引和共享证据不包含代码语义总结、漏洞猜测、Candidate 或 verdict；每个 Q 仍须自行阅读源码并形成独立判断。
 
-`baseline` 子命令读取 material set 的共享材料和 baseline 专属材料，但不会装入 protocol context、event semantics 或任何 Q。未显式指定 `--episodes` 时，episode 数等于该 material set 的性质数，以匹配 `--all-properties` 的独立审计预算。
+`baseline` 子命令实现 `matched-no-property`：它与性质侧获得相同的协议上下文、事件完成语义、故障模型、源码工具、预算和输出契约，只不提供具体 Q。每个 episode 最多返回一个主 Candidate，因此它测量的是同等预算下的 top-1 候选优先级。默认运行一次；重复实验需显式指定 `--episodes N`。
 
 ## 盲测边界
 
-人工根因、mutation 说明、正确代码切片、触发测试和历史实验结果不得放入 `audit-specs`。将来需要的隐藏评价材料应由独立存储和权限边界管理，运行 AI 时不要挂载或暴露。
+人工根因、mutation 说明、触发轨迹和历史结果不得放入 `audit-specs` 或目标源码树。当前人工机制卡位于 `evaluation/oracles`，材料装配器不会读取该目录；模型文件工具也只能访问 `TARGET_ROOT`。正式实验仍应保证运行环境不会把评价目录作为目标暴露给模型。
 
 协议模型、执行器、评价器和实验结果也不应混入审计定义目录；后续扩展位置见 [架构说明](docs/architecture.md)。
 
@@ -86,7 +86,7 @@ API key 从 `--api-key-file` 指定的 UTF-8 文本文件读取。文件必须�
 
 所有文件工具都限制在目标根目录内，并禁止读取 `.git`。
 
-模型一旦形成临时结论，最多再进行两次可能推翻该结论的源码工具调用。默认 24 轮预算中的最后一轮为强制报告轮：该轮不再提供任何工具，模型必须基于已有证据返回 `credible_risk`、`no_credible_risk` 或 `insufficient_evidence`。程序只限制调查期限，不替模型判断证据是否充分。未指定 `--allow-tests` 时，提示会明确告知模型执行工具不可用。
+模型一旦形成临时结论，最多再进行两次可能推翻该结论的源码工具调用。默认 24 轮预算中的最后一轮不再提供工具，模型必须返回一个状态为 `candidate_found`、`no_candidate` 或 `insufficient_evidence` 的 Candidate-v0 JSON 对象。程序验证格式和代码引用来源，但不判断机制语义是否正确。未指定 `--allow-tests` 时，提示会明确告知模型执行工具不可用。
 
 ## 使用方法
 
@@ -157,7 +157,7 @@ consensus-audit run \
   --api-key-file /home/nitro/Desktop/key.txt
 ```
 
-运行同一 target 的无性质 baseline：
+运行同一 target 的 matched-no-property baseline：
 
 ```bash
 consensus-audit baseline \
@@ -167,13 +167,13 @@ consensus-audit baseline \
   --model deepseek-v4-pro
 ```
 
-baseline 默认根据 material set 的性质数量创建 episode；`raft-etcd-v1` 当前因此运行 7 次。每个 episode 都使用全新的消息上下文，也可用 `--episodes` 显式覆盖。
+baseline 默认运行一个独立 top-1 episode。重复运行时显式添加 `--episodes N`；每个 episode 都使用全新的消息上下文。
 
 ## 实验口径与人工评分
 
-“给定正确 Q 后能否发现对应机制”是条件审计实验，只评价 property-conditioned audit，不能直接与多 episode baseline 比较。端到端发现实验必须在同一个 target 上让性质侧运行 `--all-properties`，让 baseline 运行默认的同数量 episode，然后分别按全部报告的 finding 并集判断是否命中目标机制。
+最小实验比较一次 `property-directed` 与一次 `matched-no-property` top-1 运行：两侧预算和 Candidate 数量相同，处理变量是是否给出目标 Q。重复运行用于观察稳定性。它不能直接代表全仓库穷举能力。
 
-运行器只保存原始报告与 evidence manifest，不机械判断报告质量。隐藏人工评价按 detection、property linkage、scenario adequacy 和 evidence fidelity 四层记录；同一机制在多个 baseline episode 中重复出现时，target-level detection 只计一次。具体表格和口径见 [评测说明](docs/evaluation.md)。
+运行器机械解析 Candidate-v0，并检查引用路径和行区间是否确实由本轮 `read_file` 返回。机制是否命中隐藏 oracle、性质关联是否正确以及 P/A/V/O 是否可用仍由人工分别评分。同一机制通过多个性质被发现时只计一个独立发现。具体口径见 [评测说明](docs/evaluation.md)。
 
 性质较多时，也可以准备一个每行一个 ID、允许空行和 `#` 注释的文本文件：
 
@@ -204,12 +204,15 @@ request.json     非敏感运行配置
 prompt.md        实际发送的系统提示和材料
 events.jsonl     模型响应、reasoning、工具调用及工具结果
 evidence-manifest.json  根据工具轨迹生成的客观读取/搜索/测试清单
-response.md      模型最终返回的Markdown审计报告
+response.md      模型最终返回的原始Candidate-v0文本
+parsed-candidate.json  结构合法时解析出的Candidate-v0
+candidate-format-validation.json  JSON与字段契约检查
+candidate-provenance-validation.json  引用路径与实际读取区间检查
 summary.json     耗时、token、轮次和最终结论
 error.json       失败时的错误与已消耗预算
 ```
 
-`runs/` 默认不纳入版本控制。
+`runs/` 默认不纳入版本控制；当前只保留 `runs/m6-candidate-v0/` 作为 Candidate-v0 和 matched-no-property 的首个完整案例。
 
 多性质运行会创建 `runs/<timestamp>-batch/`，包含：
 
@@ -223,7 +226,14 @@ batch-summary.json     每项完成/失败状态与累计token
 
 baseline 会创建 `runs/<timestamp>-baseline-batch/`，其中包含 `baseline-request.json`、`baseline-summary.json` 和该 material set 对应数量的独立 episode 目录。
 
-模型只要停止调用工具并返回非空最终内容，运行就视为完成。程序将内容原样保存为 `response.md`，不解析 Markdown，也不机械判断证据是否充分、结论是否正确；这些工作由人工审查完成。
+模型的原始输出仍保存在 `response.md`。格式不合法时运行记录为 `invalid_output`；格式合法后生成 `parsed-candidate.json`。provenance 校验只证明模型看过所引用的代码区间，不证明引用中的自然语言主张为真。
+
+解析器优先要求纯 JSON；如果响应包含且仅包含一个有效的 JSON 代码块，也会提取该对象，并在格式校验中记录代码围栏或外围说明文字警告。包含多个 JSON 对象或只有工具调用标记的响应仍为 `invalid_output`。已有运行可以在不调用模型的情况下重新解析：
+
+```bash
+consensus-audit revalidate-candidate \
+  --run-directory /path/to/run
+```
 
 `evidence-manifest.json` 不使用模型的自我描述，而是从 `events.jsonl` 重建：哪些文件真正读取了哪些区间、哪些文件只是搜索命中、运行了哪些测试、哪些工具调用失败。旧运行可以回填：
 
@@ -231,6 +241,16 @@ baseline 会创建 `runs/<timestamp>-baseline-batch/`，其中包含 `baseline-r
 consensus-audit build-evidence \
   --run-directory /path/to/property-run
 ```
+
+将一个运行目录树汇总为每次运行一行的 CSV，并预留人工评分列：
+
+```bash
+consensus-audit collect-results \
+  --run-root /path/to/runs \
+  --output evaluation-results.csv
+```
+
+该命令只收集 Candidate 状态、模型用量和源码读取成本，不会自动填写 mechanism 或 P/A/V/O 的人工分数。
 
 `--context-mode shared-evidence` 时，批次目录还包含：
 
@@ -242,7 +262,7 @@ shared-context/shared-evidence-summary.json 新取证与复用取证计数
 
 这些文件不含模型的 reasoning、报告、Candidate 或跨性质 verdict。每个性质目录中的 `evidence-manifest.json` 会单独标出其使用的新取证和复用取证。
 
-分析报告中的可信风险后续先表示为 [Candidate IR](ir/README.md)，相关 Q的同根风险经整合和语义复核后形成 Case IR，再交给 TLA+和执行器。
+Candidate-v0 的当前职责和下游边界见 [IR说明](ir/README.md)。自动场景执行与 Case IR 尚不属于当前闭环。
 
 ## 本地验证
 

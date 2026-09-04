@@ -1,0 +1,7 @@
+schema_version: mechanism-oracle/v1
+target_id: clean
+label: no_intentional_mutation
+evaluation_note: >-
+  No mechanism was intentionally injected. Do not automatically score every
+  candidate as a false positive; classify any claimed mechanism against the
+  inspected clean source.

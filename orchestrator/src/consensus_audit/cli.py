@@ -28,6 +28,8 @@ from .runner import (
     run_audit,
     run_baseline_episode,
 )
+from .results import ResultCollectionError, write_result_csv
+from .report import CandidateRevalidationError, revalidate_candidate_artifacts
 from .shared_context import SharedAuditContext
 
 
@@ -96,6 +98,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evidence.add_argument("--run-directory", required=True, type=Path)
 
+    revalidate = subparsers.add_parser(
+        "revalidate-candidate",
+        help="Reparse and revalidate Candidate-v0 artifacts for an existing run",
+    )
+    revalidate.add_argument("--run-directory", required=True, type=Path)
+
+    results = subparsers.add_parser(
+        "collect-results",
+        help="Collect per-run Candidate and cost fields into a CSV table",
+    )
+    results.add_argument("--run-root", required=True, type=Path)
+    results.add_argument("--output", type=Path)
+
     run = subparsers.add_parser("run", help="Run one independent audit")
     run.add_argument("--material-set", default="raft-etcd-v1")
     property_selection = run.add_mutually_exclusive_group(required=True)
@@ -118,13 +133,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_execution_arguments(run)
 
     baseline = subparsers.add_parser(
-        "baseline", help="Run independent unguided baseline episodes"
+        "baseline", help="Run matched-no-property baseline episodes"
     )
     baseline.add_argument("--material-set", default="raft-etcd-v1")
     baseline.add_argument(
         "--episodes",
         type=int,
-        help="independent episodes (default: property count in material set)",
+        help="independent top-1 episodes (default: 1)",
     )
     _add_execution_arguments(baseline)
     return parser
@@ -143,7 +158,11 @@ def _selected_property_ids(
             raise MaterialError(
                 f"cannot read properties file {args.properties_file}: {exc}"
             ) from exc
-        selected = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+        selected = [
+            line.strip()
+            for line in lines
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
     else:
         selected = list(args.property_ids or [])
 
@@ -161,9 +180,7 @@ def _selected_property_ids(
 def _baseline_episode_count(
     args: argparse.Namespace, material_set: MaterialSet
 ) -> int:
-    episodes = (
-        len(material_set.property_ids) if args.episodes is None else args.episodes
-    )
+    episodes = 1 if args.episodes is None else args.episodes
     if episodes <= 0:
         raise MaterialError("--episodes must be positive")
     return episodes
@@ -176,7 +193,10 @@ def _print_run_result(result: RunResult) -> None:
                 "turns": result.turns,
                 "tool_calls": result.tool_calls,
                 "usage": result.usage,
-                "response_file": "response.md" if result.report else None,
+                "response_file": "response.md" if result.response else None,
+                "candidate_status": result.candidate_status,
+                "candidate_format_valid": result.candidate_format_valid,
+                "candidate_provenance_valid": result.candidate_provenance_valid,
             },
             ensure_ascii=False,
         ),
@@ -326,6 +346,9 @@ def _run_command(args: argparse.Namespace) -> int:
                 "turns": result.turns,
                 "tool_calls": result.tool_calls,
                 "usage": result.usage,
+                "candidate_status": result.candidate_status,
+                "candidate_format_valid": result.candidate_format_valid,
+                "candidate_provenance_valid": result.candidate_provenance_valid,
             }
         )
         if not result.dry_run:
@@ -375,7 +398,7 @@ def _baseline_command(args: argparse.Namespace) -> int:
         suite_directory / "baseline-request.json",
         {
             "created_at": utc_now(),
-            "audit_mode": "unguided-baseline",
+            "audit_mode": "matched-no-property",
             "target_root": str(target_root),
             "material_set": material_set.name,
             "episodes": episodes,
@@ -390,7 +413,7 @@ def _baseline_command(args: argparse.Namespace) -> int:
             "total_max_turns": episodes * args.max_turns,
             "per_episode_max_tool_calls": args.max_tool_calls,
             "total_max_tool_calls": episodes * args.max_tool_calls,
-            "material_files": list(material_set.relative_baseline_files),
+            "material_files": list(material_set.relative_common_files),
             "dry_run": args.dry_run,
             "model": model_metadata,
         },
@@ -401,7 +424,7 @@ def _baseline_command(args: argparse.Namespace) -> int:
     failures = 0
     for episode in range(1, episodes + 1):
         print(
-            f"[{episode}/{episodes}] running unguided baseline in a fresh context",
+            f"[{episode}/{episodes}] running matched-no-property baseline in a fresh context",
             file=sys.stderr,
         )
         try:
@@ -443,6 +466,9 @@ def _baseline_command(args: argparse.Namespace) -> int:
                 "turns": result.turns,
                 "tool_calls": result.tool_calls,
                 "usage": result.usage,
+                "candidate_status": result.candidate_status,
+                "candidate_format_valid": result.candidate_format_valid,
+                "candidate_provenance_valid": result.candidate_provenance_valid,
             }
         )
         if not result.dry_run:
@@ -453,7 +479,7 @@ def _baseline_command(args: argparse.Namespace) -> int:
         suite_directory / "baseline-summary.json",
         {
             "completed_at": utc_now(),
-            "audit_mode": "unguided-baseline",
+            "audit_mode": "matched-no-property",
             "execution": (
                 "sequential-isolated-contexts"
                 if shared_context is None
@@ -492,11 +518,39 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "build-evidence":
             print(write_evidence_manifest(args.run_directory))
             raise SystemExit(0)
+        if args.command == "revalidate-candidate":
+            artifacts = revalidate_candidate_artifacts(args.run_directory)
+            print(
+                json.dumps(
+                    {
+                        "candidate_status": artifacts.status,
+                        "format_valid": artifacts.format_valid,
+                        "provenance_valid": artifacts.provenance_valid,
+                        "parsed_file": artifacts.parsed_file,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            raise SystemExit(0)
+        if args.command == "collect-results":
+            rendered = write_result_csv(args.run_root, args.output)
+            if args.output is None:
+                print(rendered, end="")
+            else:
+                print(args.output.resolve())
+            raise SystemExit(0)
         if args.command == "run":
             raise SystemExit(_run_command(args))
         if args.command == "baseline":
             raise SystemExit(_baseline_command(args))
         parser.error(f"unsupported command: {args.command}")
-    except (MaterialError, DeepSeekError, EvidenceError, AuditRunError) as exc:
+    except (
+        MaterialError,
+        DeepSeekError,
+        EvidenceError,
+        AuditRunError,
+        ResultCollectionError,
+        CandidateRevalidationError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc

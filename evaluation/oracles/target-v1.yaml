@@ -1,0 +1,31 @@
+schema_version: mechanism-oracle/v1
+target_id: target-v1
+label: mutant
+primary_property: Q-VOTE-1
+valid_related_properties: [Q-ELECT-1]
+ground_truth_mechanism:
+  mechanism_id: vote-visible-without-required-durable-sync
+  anchor_regions:
+    - path: rawnode.go
+      symbol: MustSync
+      line_hint: 193
+    - path: raft.go
+      symbol: raft.Step
+      role: vote grant and response construction
+  violated_obligation: >-
+    Before an affirmative formal vote becomes externally effective, the HardState
+    carrying that vote must reach the fault model's required durable completion point.
+  decisive_relation: >-
+    A Vote-only HardState change does not require synchronous persistence, so an
+    affirmative response may become externally visible before the Vote survives crash.
+  accepted_equivalent_explanations:
+    - MustSync ignores st.Vote changes when Term and entry count are unchanged.
+    - Crash after publishing VoteResp but before durable Vote persistence can erase the first vote.
+  incorrect_but_related_explanations:
+    - RequestVote has no in-memory votedFor guard.
+    - The election quorum formula is wrong.
+scenario_requirements:
+  precondition: Same-term competing candidates and a voter whose durable Vote is empty.
+  decisive_actions: First affirmative vote becomes visible, voter crashes before durable Vote, then grants the other candidate after restart.
+  violation: One voter completes votes for two distinct candidates in the same term.
+  oracle: Observe both affirmative same-term responses from that voter.

@@ -1,0 +1,10 @@
+{
+  "schema_version": "candidate-provenance-validation/v1",
+  "generated_at": "2026-09-04T13:39:42.919942+00:00",
+  "valid": false,
+  "skipped": true,
+  "errors": [
+    "provenance validation skipped because Candidate-v0 format is invalid"
+  ],
+  "checked_references": []
+}
