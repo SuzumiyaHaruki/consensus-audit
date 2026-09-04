@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "consensus-audit"
+version = "0.1.0"
+description = "Property-directed LLM auditing for consensus implementations"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=5.4"]
+
+[project.scripts]
+consensus-audit = "consensus_audit.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "orchestrator/src"}
+
+[tool.setuptools.packages.find]
+where = ["orchestrator/src"]
+

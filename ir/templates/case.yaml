@@ -1,0 +1,56 @@
+version: 1
+case_id: "<id>"
+review_state: "draft"
+derived_from: ["<candidate ID>"]
+
+properties:
+  primary: ["<Q-ID>"]
+  derived: []
+
+scope:
+  protocol: "<protocol>"
+  fault_model: "<fault model>"
+  target: "<target>"
+  configuration: {}
+
+risk:
+  classification: "<classification>"
+  mechanism: "<reviewed mechanism>"
+  causal_chain: []
+
+accepted_evidence: []
+
+precondition:
+  protocol: []
+  implementation: []
+  environment: []
+
+topology:
+  constraints: []
+  concrete: null
+
+actions:
+  required_capabilities: []
+  sequence: []
+
+violation: "<V>"
+oracle:
+  observations: []
+  observation_condition: "<O>"
+  false_positive_guards: []
+
+model_check:
+  status: "pending"
+  model: null
+  constants: {}
+  p_predicate: null
+
+execution:
+  status: "pending"
+  adapter: null
+  p_realization: null
+
+review:
+  changes: []
+  rejected_claims: []
+  open_questions: []

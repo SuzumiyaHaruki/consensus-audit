@@ -1,0 +1,37 @@
+version: 1
+candidate_id: "<id>"
+status: "draft"
+
+source:
+  run: "<property run>"
+  response: "<response.md>"
+  evidence_manifest: "<evidence-manifest.json>"
+
+properties: ["<Q-ID>"]
+
+risk:
+  classification: "<library_defect | integration_risk | configuration_dependent | unresolved>"
+  mechanism: "<suspected implementation mechanism>"
+  causal_chain: []
+
+evidence: []
+
+precondition:
+  protocol: []
+  implementation: []
+  environment: []
+
+topology:
+  constraints: []
+  concrete: null
+
+actions:
+  required_capabilities: []
+  sequence: []
+
+violation: "<V>"
+oracle:
+  observations: []
+  observation_condition: "<O>"
+
+uncertainties: []
