@@ -19,3 +19,29 @@ material_sets:
       Q-LOG-2: "protocols/raft/properties/Q-LOG-2.md"
       Q-LEADER-1: "protocols/raft/properties/Q-LEADER-1.md"
       Q-STATE-1: "protocols/raft/properties/Q-STATE-1.md"
+  raft-etcd-logmatching-local-original-v1:
+    protocol: "raft"
+    target: "etcd-raft"
+    common_files:
+      - "fault-models/crash-recovery-cft.md"
+      - "protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md"
+      - "protocols/raft/targets/etcd-raft/LOCAL_LOG_MATCHING_DIAGNOSTIC.md"
+      - "common/AUDIT_TASK.md"
+      - "protocols/raft/PROTOCOL_CONTEXT.md"
+      - "protocols/raft/EVENT_SEMANTICS.md"
+      - "common/REPORT_TEMPLATE.md"
+    properties:
+      Q-LOG-2: "protocols/raft/properties/Q-LOG-2-original.md"
+  raft-etcd-logmatching-local-expanded-v1:
+    protocol: "raft"
+    target: "etcd-raft"
+    common_files:
+      - "fault-models/crash-recovery-cft.md"
+      - "protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md"
+      - "protocols/raft/targets/etcd-raft/LOCAL_LOG_MATCHING_DIAGNOSTIC.md"
+      - "common/AUDIT_TASK.md"
+      - "protocols/raft/PROTOCOL_CONTEXT.md"
+      - "protocols/raft/EVENT_SEMANTICS.md"
+      - "common/REPORT_TEMPLATE.md"
+    properties:
+      Q-LOG-2: "protocols/raft/properties/Q-LOG-2.md"

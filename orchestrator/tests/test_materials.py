@@ -129,6 +129,23 @@ material_sets:
             baseline_user,
         )
 
+    def test_local_log_matching_forms_differ_only_in_property_material(self) -> None:
+        project = Path(__file__).resolve().parents[2]
+        original = load_material_set(
+            project / "audit-specs", "raft-etcd-logmatching-local-original-v1"
+        )
+        expanded = load_material_set(
+            project / "audit-specs", "raft-etcd-logmatching-local-expanded-v1"
+        )
+
+        self.assertEqual(original.relative_common_files, expanded.relative_common_files)
+        self.assertEqual(original.property_ids, ("Q-LOG-2",))
+        self.assertEqual(expanded.property_ids, ("Q-LOG-2",))
+        original_property = original.property_file("Q-LOG-2").read_text(encoding="utf-8")
+        expanded_property = expanded.property_file("Q-LOG-2").read_text(encoding="utf-8")
+        self.assertNotIn("Equivalent violation form", original_property)
+        self.assertIn("Equivalent violation form", expanded_property)
+
 
 if __name__ == "__main__":
     unittest.main()
