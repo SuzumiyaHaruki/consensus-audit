@@ -1,6 +1,6 @@
 # Raft Event and Completion Semantics
 
-These are protocol-level events, not implementation mappings. The auditor must locate and justify each event's actual completion point in the target code.
+This is project-authored event vocabulary, not a quotation or requirement extracted from a paper. It is retained for reference and is not automatically loaded into model tasks. An adopted interpretation must be justified using the registered protocol sources and actual target contracts; these definitions do not establish executable behavior.
 
 ## Conventions
 
@@ -30,7 +30,7 @@ The event does not assume prior persistence; verifying crash-safe ordering is pa
 
 `Entry(i,t,k,p)` identifies a log entry by index, term, kind, and protocol payload. Entries differing in kind or payload are distinct even when index and term match.
 
-`LogicalLog(n)` is the current ordered logical log represented by `n`'s durable state, accepted unstable state, and installed snapshot prefix. Moving an entry between volatile and durable storage, or compacting a prefix into a snapshot that preserves it, is not logical deletion. Snapshot operations are in scope when they can affect the selected property.
+`LogicalLog(n)` is the current ordered logical log represented by `n`'s durable state, accepted unstable state, and installed snapshot prefix. Moving an entry between volatile and durable storage, or compacting a prefix into a snapshot that preserves it, is not logical deletion. Snapshot operations are relevant when they can affect a task requirement.
 
 `LogContains(n,i,e)` means the completed `LogicalLog(n)` contains entry `e` at index `i`.
 

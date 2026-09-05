@@ -6,7 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .materials import MaterialError
+class MaterialError(ValueError):
+    """Invalid material or stage input/output."""
 
 
 SOURCE_KINDS = ("protocol", "extension", "experiment_config", "environment")

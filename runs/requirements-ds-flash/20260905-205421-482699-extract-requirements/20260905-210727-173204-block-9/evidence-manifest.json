@@ -1,0 +1,24 @@
+{
+  "stage": "extract-requirements",
+  "task_id": "block-9",
+  "files": {
+    "read": []
+  },
+  "material_blocks_read": [
+    "crash-recovery-cft:p0:l1",
+    "dissertation-errata:p0:l35",
+    "dissertation:p44:l5",
+    "dissertation:p65:l1",
+    "dissertation:p66:l1",
+    "dissertation:p68:l20",
+    "dissertation:p72:l35",
+    "etcd-raft-boundary:p0:l1",
+    "raft-extended:figure2:1",
+    "raft-extended:figure2:5",
+    "raft-extended:p5:l65"
+  ],
+  "tool_calls": {
+    "read_material": 11
+  },
+  "tool_errors": []
+}

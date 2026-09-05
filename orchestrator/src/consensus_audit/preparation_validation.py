@@ -37,6 +37,12 @@ def validate_requirements(data: dict[str, Any], bundle: dict[str, Any],
                 sources = {s["id"]: s for s in bundle["sources"]}
                 require(any(sources[blocks[r["block_id"]]["source_id"]]["category"] in {"protocol", "extension"}
                             for r in item["source_refs"]), "protocol requirement needs original protocol/extension evidence")
+    requirement_ids = {r["id"] for r in data["requirements"]}
+    for item in data["assumptions"] + data["unresolved"]:
+        if "requirement_ids" in item:
+            links = item["requirement_ids"]
+            require(isinstance(links, list) and all(isinstance(rid, str) and rid in requirement_ids for rid in links),
+                    "assumption/unresolved item references an unknown requirement")
     records = data.get("block_results")
     require(isinstance(records, list), "block_results must be an array")
     expected = set(expected_blocks if expected_blocks is not None else [b["id"] for b in bundle["blocks"]])
@@ -86,13 +92,14 @@ def operation_groups(requirements: list[dict[str, Any]]) -> list[dict[str, Any]]
     for requirement in requirements:
         for operation in requirement["operation"]:
             groups.setdefault(operation, []).append(requirement)
-    return [{"operation": operation, "requirements": items} for operation, items in groups.items()]
+    return [{"task_id": f"operation-{index}", "operation": operation, "requirements": items}
+            for index, (operation, items) in enumerate(groups.items(), 1)]
 
 
 def validate_mappings(data: dict[str, Any], requirements: list[dict[str, Any]],
                       bundle: dict[str, Any], *, workspace: Any,
                       evidence: dict[str, Any]) -> None:
-    from .report import validate_candidate_provenance
+    from .report import validate_code_refs
 
     require(isinstance(data.get("mappings"), list), "mappings must be an array")
     expected = {r["id"] for r in requirements}
@@ -114,9 +121,7 @@ def validate_mappings(data: dict[str, Any], requirements: list[dict[str, Any]],
                 start, end = loc.get("start_line"), loc.get("end_line")
                 require(type(start) is int and type(end) is int and 1 <= start <= end, "invalid code interval")
                 refs.append({**loc, "claim": loc["responsibility"]})
-        result = validate_candidate_provenance({"source_evidence": refs}, target_root=workspace.root,
-                                               evidence_manifest=evidence)
-        require(result["valid"], "; ".join(result["errors"]))
+        validate_code_refs(refs, target_root=workspace.root, evidence=evidence)
         deps = mapping.get("unresolved_dependencies")
         require(isinstance(deps, list) and all(nonempty(d) for d in deps), "invalid unresolved_dependencies")
         if status in {"partial", "unresolved"}:

@@ -1,0 +1,15 @@
+{
+  "stage": "extract-requirements",
+  "task_id": "block-2",
+  "files": {
+    "read": []
+  },
+  "material_blocks_read": [
+    "raft-extended:p1:l50",
+    "raft-extended:p2:l1"
+  ],
+  "tool_calls": {
+    "read_material": 2
+  },
+  "tool_errors": []
+}

@@ -46,9 +46,23 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(result["engine"], "python-fallback")
         self.assertTrue(any("main.go:3" in match for match in result["matches"]))
 
-    def test_tests_are_disabled_by_default(self) -> None:
+    def test_execution_tool_is_not_available(self) -> None:
         result = self.workspace.execute("run_go_test", {})
         self.assertFalse(result["ok"])
+
+    def test_search_supports_other_languages_and_excludes_git(self) -> None:
+        (self.root / "engine.rs").write_text("fn completion_marker() {}\n", encoding="utf-8")
+        for fallback in (False, True):
+            with self.subTest(fallback=fallback):
+                if fallback:
+                    with patch("consensus_audit.workspace.shutil.which", return_value=None):
+                        matches = self.workspace.search_code("completion_marker")["matches"]
+                        private = self.workspace.search_code("secret")["matches"]
+                else:
+                    matches = self.workspace.search_code("completion_marker")["matches"]
+                    private = self.workspace.search_code("secret")["matches"]
+                self.assertTrue(any("engine.rs" in line for line in matches))
+                self.assertEqual(private, [])
 
 
 if __name__ == "__main__":

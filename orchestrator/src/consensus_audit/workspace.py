@@ -24,11 +24,10 @@ def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int
 class SourceWorkspace:
     """Read-only source tools scoped to one target tree."""
 
-    def __init__(self, root: Path, *, allow_tests: bool = False):
+    def __init__(self, root: Path):
         self.root = root.resolve()
         if not self.root.is_dir():
             raise WorkspaceError(f"target root is not a directory: {self.root}")
-        self.allow_tests = allow_tests
 
     def _resolve(self, relative: str, *, require_file: bool = False) -> Path:
         relative = relative or "."
@@ -115,7 +114,7 @@ class SourceWorkspace:
         self,
         pattern: str,
         path: str = ".",
-        glob: str = "*.go",
+        glob: str = "*",
         fixed_strings: bool = False,
         max_results: int = 100,
     ) -> dict[str, Any]:
@@ -146,6 +145,10 @@ class SourceWorkspace:
             "500",
             "--glob",
             glob,
+            "--glob",
+            "!.git/**",
+            "--glob",
+            "!**/.git/**",
         ]
         if fixed_strings:
             command.append("--fixed-strings")
@@ -230,64 +233,6 @@ class SourceWorkspace:
             "engine": "python-fallback",
         }
 
-    @staticmethod
-    def _validate_go_package(package: str) -> str:
-        if package in (".", "./..."):
-            return package
-        if not package.startswith("./"):
-            raise WorkspaceError("Go package must be '.', './...', or start with './'")
-        parts = package[2:].split("/")
-        if not parts or any(
-            not part
-            or part in (".", "..", "...")
-            or re.fullmatch(r"[A-Za-z0-9_.-]+", part) is None
-            for part in parts
-        ):
-            raise WorkspaceError("invalid Go package path")
-        return package
-
-    def run_go_test(
-        self,
-        package: str = "./...",
-        test_regex: str = "",
-        timeout_seconds: int = 60,
-    ) -> dict[str, Any]:
-        if not self.allow_tests:
-            raise WorkspaceError("test execution is disabled for this run")
-        checked_package = self._validate_go_package(package)
-        timeout = _bounded_int(
-            timeout_seconds, default=60, minimum=1, maximum=300
-        )
-        command = ["go", "test", f"-timeout={timeout}s"]
-        if test_regex:
-            if len(test_regex) > 300 or "\x00" in test_regex:
-                raise WorkspaceError("invalid test regex")
-            command.extend(["-run", test_regex])
-        command.append(checked_package)
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=self.root,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=timeout + 15,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as exc:
-            output = exc.stdout or ""
-            raise WorkspaceError(
-                f"go test exceeded {timeout + 15}s; partial output: {output[-2000:]}"
-            ) from exc
-        output = completed.stdout
-        if len(output) > 30_000:
-            output = output[:15_000] + "\n... OUTPUT TRUNCATED ...\n" + output[-15_000:]
-        return {
-            "command": command,
-            "exit_code": completed.returncode,
-            "output": output,
-        }
-
     def tool_definitions(self) -> list[dict[str, Any]]:
         tools: list[dict[str, Any]] = [
             {
@@ -334,7 +279,7 @@ class SourceWorkspace:
                         "properties": {
                             "pattern": {"type": "string"},
                             "path": {"type": "string", "default": "."},
-                            "glob": {"type": "string", "default": "*.go"},
+                            "glob": {"type": "string", "default": "*"},
                             "fixed_strings": {"type": "boolean", "default": False},
                             "max_results": {"type": "integer", "minimum": 1, "maximum": 300},
                         },
@@ -343,29 +288,6 @@ class SourceWorkspace:
                 },
             },
         ]
-        if self.allow_tests:
-            tools.append(
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "run_go_test",
-                        "description": "Run a bounded Go test command without a shell.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "package": {"type": "string", "default": "./..."},
-                                "test_regex": {"type": "string", "default": ""},
-                                "timeout_seconds": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 300,
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                    },
-                }
-            )
         return tools
 
     def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -374,8 +296,6 @@ class SourceWorkspace:
             "read_file": self.read_file,
             "search_code": self.search_code,
         }
-        if self.allow_tests:
-            handlers["run_go_test"] = self.run_go_test
         handler = handlers.get(name)
         if handler is None:
             return {"ok": False, "error": f"unknown or disabled tool: {name}"}
@@ -395,3 +315,20 @@ class SourceWorkspace:
             else:
                 result = self.execute(name, arguments)
         return json.dumps(result, ensure_ascii=False)
+
+
+class InspectionWorkspace(SourceWorkspace):
+    """Source tools plus explicit access to the registered material bundle."""
+
+    def __init__(self, root: Path, bundle: dict[str, Any]):
+        from .source_materials import MaterialWorkspace
+        super().__init__(root)
+        self.materials = MaterialWorkspace(bundle)
+
+    def tool_definitions(self) -> list[dict[str, Any]]:
+        return super().tool_definitions() + self.materials.tool_definitions()
+
+    def execute_json(self, name: str, arguments_json: str) -> str:
+        if name == "read_material":
+            return self.materials.execute_json(name, arguments_json)
+        return super().execute_json(name, arguments_json)

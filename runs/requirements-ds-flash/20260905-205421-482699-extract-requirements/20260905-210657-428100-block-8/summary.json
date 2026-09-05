@@ -1,0 +1,27 @@
+{
+  "stage": "extract-requirements",
+  "task_id": "block-8",
+  "status": "completed",
+  "turns": 2,
+  "tool_calls": 3,
+  "usage": {
+    "prompt_tokens": 21415,
+    "completion_tokens": 3703,
+    "total_tokens": 25118,
+    "prompt_cache_hit_tokens": 11520,
+    "prompt_cache_miss_tokens": 9895
+  },
+  "errors": [],
+  "format_recovery_used": false,
+  "cost": {
+    "usage": {
+      "prompt_tokens": 21415,
+      "completion_tokens": 3703,
+      "total_tokens": 25118,
+      "prompt_cache_hit_tokens": 11520,
+      "prompt_cache_miss_tokens": 9895
+    },
+    "estimated_cost": null,
+    "reason": "No explicit pricing supplied."
+  }
+}

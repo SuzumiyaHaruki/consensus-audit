@@ -1,0 +1,19 @@
+{
+  "stage": "extract-requirements",
+  "task_id": "block-6",
+  "files": {
+    "read": []
+  },
+  "material_blocks_read": [
+    "crash-recovery-cft:p0:l1",
+    "etcd-raft-boundary:p0:l1",
+    "raft-extended:figure2:4",
+    "raft-extended:p5:l65",
+    "raft-extended:p5:l87",
+    "raft-extended:p6:l69"
+  ],
+  "tool_calls": {
+    "read_material": 6
+  },
+  "tool_errors": []
+}

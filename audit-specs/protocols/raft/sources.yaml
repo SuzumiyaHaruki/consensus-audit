@@ -1,0 +1,32 @@
+# Source inventory. Version labels use existing publications/Git revisions.
+# This inventory is not itself a protocol requirement or an LLM instruction.
+protocol: raft
+sources:
+  - id: raft-extended
+    category: protocol
+    location: https://raft.github.io/raft.pdf
+    version: Extended Version, published May 20, 2014
+    license: No standalone redistribution license verified; keep original and conversion in local cache.
+    local: .cache/materials/raft/raft.pdf
+    scope: Basic Raft, Figure 2 and global properties; retain the complete paper, including out-of-scope sections.
+  - id: dissertation
+    category: extension
+    location: https://github.com/ongardie/dissertation
+    version: 0c10ea1b53d73bf6d163bdde8e4141a1cbd8f36a (existing upstream Git revision)
+    license: Diego Ongaro, 2014; CC BY 3.0 US or CC BY 4.0 International; see repository LICENSE.
+    local: .cache/materials/raft/dissertation.pdf
+    scope: Sections 3.8-3.10, 4.2.3, chapter 5, sections 6.4-6.4.1 and 9.6; variants and timing assumptions need review.
+  - id: dissertation-errata
+    category: extension
+    location: https://github.com/ongardie/dissertation/blob/0c10ea1b53d73bf6d163bdde8e4141a1cbd8f36a/README.md
+    version: Same dissertation Git revision
+    license: Same dissertation repository LICENSE.
+    local: .cache/materials/raft/dissertation-README.md
+    scope: Original author errata, including lastApplied persistence; not a target-library contract.
+project_definitions:
+  - PROTOCOL_CONTEXT.md
+  - EVENT_SEMANTICS.md
+unresolved:
+  - Human review of PDF conversion and protocol/extension interpretations is pending. Figures other than Figure 2 may lose graphical relationships in text; consult the cached PDFs.
+  - Figure 2 lastApplied persistence must be reconciled with the author's dissertation erratum for a persistent state machine; do not silently choose an interpretation.
+  - PreVote and leader-transfer variants in dissertation sections 4.2.3 and 9.6 require explicit applicability review for the selected implementation.

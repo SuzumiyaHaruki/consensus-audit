@@ -1,3 +1,5 @@
+> Research archive only. The following describes historical experiments, not the current runtime or output contract. Historical results are not model input.
+
 # Hidden evaluation material
 
 Files below `oracles/` describe the manually injected mechanism in each target. They are evaluator-only material: the material loader does not include this directory in model prompts, and target source trees must not contain these cards.

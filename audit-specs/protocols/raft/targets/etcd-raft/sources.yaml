@@ -1,0 +1,30 @@
+# etcd/raft scope and contract locations; local paths are repository-relative.
+protocol: raft
+implementation: etcd-raft
+sources:
+  - id: crash-recovery-cft
+    category: environment
+    location: audit-specs/fault-models/crash-recovery-cft.md
+    version: Working-tree version at material import (exact text included in bundle).
+    license: Existing project material.
+    local: audit-specs/fault-models/crash-recovery-cft.md
+    scope: Existing experiment fault model; not a quote from the paper.
+  - id: etcd-raft-boundary
+    category: experiment_config
+    location: audit-specs/protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md
+    version: Working-tree version at material import (exact text included in bundle).
+    license: Existing project material.
+    local: audit-specs/protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md
+    scope: Existing complete target scope; sync/async storage, both PreVote settings, snapshots, reads and transfer remain included.
+on_demand_sources:
+  - id: target-contracts
+    category: target_documentation
+    location: TARGET_ROOT/README*, doc.go, public type/interface/method/configuration comments
+    version: Actual target selected by --target-root; never substituted with upstream latest.
+    local: Read with existing target source tools during location/audit only.
+    scope: Relevant caller obligations, completion semantics, concurrency and responsibility boundaries.
+unresolved:
+  - Human confirmation of target path and target revision is pending; no target has been selected.
+  - Fixed membership remains the configured scope; do not silently import membership-change requirements as applicable.
+  - Asynchronous storage completion and publication contracts require target-version design/API evidence during location; the paper alone does not specify that API.
+  - Read-only lease modes may require clock/availability assumptions absent from the configured fault model. Scope remains included; applicability and assumptions need review.

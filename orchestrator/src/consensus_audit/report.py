@@ -1,482 +1,128 @@
+"""JSON parsing, inspected-source references and operation task results."""
 from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .artifacts import utc_now, write_json
+from .source_materials import nonempty, require, validate_refs
 
 
-CANDIDATE_STATUSES = {
-    "candidate_found",
-    "no_candidate",
-    "insufficient_evidence",
-}
-
-REQUIRED_TOP_LEVEL_KEYS = {
-    "status",
-    "property_id",
-    "property_statement",
-    "summary",
-    "source_evidence",
-    "mechanism",
-    "causal_chain",
-    "test_sketch",
-    "uncertainties",
-}
-
-
-@dataclass(frozen=True)
-class CandidateArtifacts:
-    status: str
-    parse_recoverable: bool
-    strict_output_compliant: bool
-    schema_valid: bool
-    provenance_valid: bool
-    parsed_file: str | None
-
-    @property
-    def format_valid(self) -> bool:
-        """Backward-compatible alias for schema validity."""
-        return self.schema_valid
-
-
-def extract_json_object(
-    response: str,
-) -> tuple[dict[str, Any] | None, bool, bool, list[str], list[str]]:
-    errors: list[str] = []
-    warnings: list[str] = []
+def parse_json(response: str) -> dict[str, Any]:
+    """Accept a single object, optionally wrapped in prose or a JSON fence."""
     text = response.strip()
     try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError as exc:
-        direct_error = (
-            f"response is not one JSON object: {exc.msg} at line {exc.lineno} "
-            f"column {exc.colno}"
-        )
-        fenced_objects: list[tuple[dict[str, Any], re.Match[str]]] = []
-        pattern = re.compile(
-            r"```(?:json)?\s*(.*?)\s*```",
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        for match in pattern.finditer(text):
-            try:
-                fenced_value = json.loads(match.group(1))
-            except json.JSONDecodeError:
-                continue
-            if isinstance(fenced_value, dict):
-                fenced_objects.append((fenced_value, match))
-        if len(fenced_objects) == 1:
-            parsed, match = fenced_objects[0]
-            warnings.append("extracted the unique JSON object from a code fence")
-            surrounding = text[: match.start()] + text[match.end() :]
-            if surrounding.strip():
-                warnings.append("ignored surrounding prose outside the JSON code fence")
-        elif len(fenced_objects) > 1:
-            errors.append("response contains multiple valid JSON code blocks")
-            return None, False, False, errors, warnings
+        value = json.loads(text)
+    except ValueError:
+        fences = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.I | re.S)
+        if fences:
+            require(len(fences) == 1, "response contains multiple JSON blocks")
+            # Do not select a fenced object while silently ignoring another object.
+            outside = re.sub(r"```(?:json)?\s*.*?\s*```", "", text, flags=re.I | re.S)
+            require("{" not in outside, "response contains multiple JSON objects")
+            value = json.loads(fences[0])
         else:
-            # Require the first opening brace through EOF to be one object;
-            # never silently select the last of several objects or a nested one.
-            try:
-                start = text.index("{")
-                parsed = json.loads(text[start:])
-            except ValueError:
-                errors.append(direct_error)
-                return None, False, False, errors, warnings
-            warnings.append("extracted the unique JSON object following prose")
-        strict_output_compliant = False
-        parse_recoverable = True
-    else:
-        strict_output_compliant = True
-        parse_recoverable = isinstance(parsed, dict)
-    if not isinstance(parsed, dict):
-        errors.append("Candidate-v0 output must be a JSON object")
-        return None, False, strict_output_compliant, errors, warnings
-    return parsed, parse_recoverable, strict_output_compliant, errors, warnings
-
-
-def _require_nonempty_string(
-    value: Any,
-    field: str,
-    errors: list[str],
-) -> None:
-    if not isinstance(value, str) or not value.strip():
-        errors.append(f"{field} must be a non-empty string")
-
-
-def _validate_string_list(
-    value: Any,
-    field: str,
-    errors: list[str],
-    *,
-    minimum: int = 0,
-) -> None:
-    if not isinstance(value, list):
-        errors.append(f"{field} must be a list of strings")
-        return
-    if len(value) < minimum:
-        errors.append(f"{field} must contain at least {minimum} item(s)")
-    for index, item in enumerate(value):
-        _require_nonempty_string(item, f"{field}[{index}]", errors)
-
-
-def _validate_source_evidence(value: Any, errors: list[str]) -> None:
-    if not isinstance(value, list):
-        errors.append("source_evidence must be a list")
-        return
-    for index, item in enumerate(value):
-        prefix = f"source_evidence[{index}]"
-        if not isinstance(item, dict):
-            errors.append(f"{prefix} must be an object")
-            continue
-        _require_nonempty_string(item.get("path"), f"{prefix}.path", errors)
-        start = item.get("start_line")
-        end = item.get("end_line")
-        if not isinstance(start, int) or isinstance(start, bool) or start <= 0:
-            errors.append(f"{prefix}.start_line must be a positive integer")
-        if not isinstance(end, int) or isinstance(end, bool) or end <= 0:
-            errors.append(f"{prefix}.end_line must be a positive integer")
-        if isinstance(start, int) and isinstance(end, int) and start > end:
-            errors.append(f"{prefix}.start_line must not exceed end_line")
-        _require_nonempty_string(item.get("claim"), f"{prefix}.claim", errors)
-
-
-def validate_candidate_format(
-    candidate: dict[str, Any],
-    *,
-    audit_mode: str,
-    expected_property_id: str | None,
-    allowed_requirement_ids: list[str] | None = None,
-) -> tuple[list[str], list[str]]:
-    errors: list[str] = []
-    warnings: list[str] = []
-    missing = sorted(REQUIRED_TOP_LEVEL_KEYS - candidate.keys())
-    if missing:
-        errors.append("missing required field(s): " + ", ".join(missing))
-    extra = sorted(candidate.keys() - REQUIRED_TOP_LEVEL_KEYS)
-    if extra:
-        warnings.append("unrecognized field(s): " + ", ".join(extra))
-
-    status = candidate.get("status")
-    if status not in CANDIDATE_STATUSES:
-        errors.append(
-            "status must be candidate_found, no_candidate, or insufficient_evidence"
-        )
-
-    property_id = candidate.get("property_id")
-    if property_id is not None and not isinstance(property_id, str):
-        errors.append("property_id must be a string or null")
-    if audit_mode == "property-directed":
-        if not expected_property_id:
-            errors.append("property-directed validation requires an expected property ID")
-        elif property_id != expected_property_id:
-            errors.append(
-                f"property_id must equal the selected property {expected_property_id!r}"
-            )
-    elif audit_mode == "matched-no-property":
-        if property_id is not None:
-            errors.append("property_id must be null in matched-no-property mode")
-    elif audit_mode == "prepared":
-        if not allowed_requirement_ids:
-            errors.append("prepared validation requires task requirement IDs")
-        elif property_id is not None and property_id not in allowed_requirement_ids:
-            errors.append("property_id must belong to this prepared task")
-        if status == "candidate_found" and property_id is None:
-            errors.append("prepared candidate_found requires a task requirement ID")
-    else:
-        errors.append(f"unsupported audit mode {audit_mode!r}")
-
-    _require_nonempty_string(
-        candidate.get("property_statement"), "property_statement", errors
-    )
-    _require_nonempty_string(candidate.get("summary"), "summary", errors)
-    _validate_source_evidence(candidate.get("source_evidence"), errors)
-    _validate_string_list(candidate.get("uncertainties"), "uncertainties", errors)
-
-    if status == "candidate_found":
-        evidence = candidate.get("source_evidence")
-        if isinstance(evidence, list) and not evidence:
-            errors.append("candidate_found requires at least one source_evidence item")
-
-        mechanism = candidate.get("mechanism")
-        if not isinstance(mechanism, dict):
-            errors.append("candidate_found requires a mechanism object")
-        else:
-            _require_nonempty_string(
-                mechanism.get("violated_obligation"),
-                "mechanism.violated_obligation",
-                errors,
-            )
-            _require_nonempty_string(
-                mechanism.get("decisive_relation"),
-                "mechanism.decisive_relation",
-                errors,
-            )
-
-        _validate_string_list(
-            candidate.get("causal_chain"), "causal_chain", errors, minimum=2
-        )
-
-        sketch = candidate.get("test_sketch")
-        if not isinstance(sketch, dict):
-            errors.append("candidate_found requires a test_sketch object")
-        else:
-            _require_nonempty_string(
-                sketch.get("precondition"), "test_sketch.precondition", errors
-            )
-            _validate_string_list(
-                sketch.get("actions"), "test_sketch.actions", errors, minimum=1
-            )
-            _require_nonempty_string(
-                sketch.get("violation"), "test_sketch.violation", errors
-            )
-            _require_nonempty_string(sketch.get("oracle"), "test_sketch.oracle", errors)
-    elif status in {"no_candidate", "insufficient_evidence"}:
-        if candidate.get("mechanism") is not None:
-            errors.append(f"{status} requires mechanism to be null")
-        chain = candidate.get("causal_chain")
-        if chain != []:
-            errors.append(f"{status} requires an empty causal_chain")
-        if candidate.get("test_sketch") is not None:
-            errors.append(f"{status} requires test_sketch to be null")
-
-    return errors, warnings
-
-
-def _read_ranges(evidence_manifest: dict[str, Any]) -> dict[str, list[tuple[int, int]]]:
-    result: dict[str, list[tuple[int, int]]] = {}
-    files = evidence_manifest.get("files")
-    if not isinstance(files, dict):
-        return result
-    entries = files.get("read")
-    if not isinstance(entries, list):
-        return result
-    for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
-            continue
-        ranges: list[tuple[int, int]] = []
-        for item in entry.get("ranges", []):
-            if not isinstance(item, dict):
-                continue
-            start, end = item.get("start"), item.get("end")
-            if isinstance(start, int) and isinstance(end, int):
-                ranges.append((start, end))
-        result[entry["path"]] = ranges
-    return result
-
-
-def _range_is_covered(start: int, end: int, ranges: list[tuple[int, int]]) -> bool:
-    cursor = start
-    for range_start, range_end in sorted(ranges):
-        if range_end < cursor:
-            continue
-        if range_start > cursor:
-            return False
-        cursor = max(cursor, range_end + 1)
-        if cursor > end:
-            return True
-    return False
-
-
-def validate_candidate_provenance(
-    candidate: dict[str, Any],
-    *,
-    target_root: Path,
-    evidence_manifest: dict[str, Any],
-) -> dict[str, Any]:
-    root = target_root.resolve()
-    ranges_by_path = _read_ranges(evidence_manifest)
-    errors: list[str] = []
-    checked: list[dict[str, Any]] = []
-    evidence = candidate.get("source_evidence")
-    if not isinstance(evidence, list):
-        evidence = []
-
-    for index, item in enumerate(evidence):
-        if not isinstance(item, dict):
-            continue
-        path = str(item.get("path") or "")
-        start = item.get("start_line")
-        end = item.get("end_line")
-        prefix = f"source_evidence[{index}]"
-        path_object = Path(path)
-        exists = False
-        inside_target = False
-        if path_object.is_absolute() or ".." in path_object.parts or ".git" in path_object.parts:
-            errors.append(f"{prefix}.path is not a permitted target-relative path: {path!r}")
-        else:
-            resolved = (root / path_object).resolve()
-            try:
-                resolved.relative_to(root)
-                inside_target = True
-            except ValueError:
-                errors.append(f"{prefix}.path escapes TARGET_ROOT: {path!r}")
-            if inside_target:
-                exists = resolved.is_file()
-                if not exists:
-                    errors.append(f"{prefix}.path is not an existing file: {path!r}")
-
-        read_ranges = ranges_by_path.get(path, [])
-        covered = False
-        if isinstance(start, int) and isinstance(end, int):
-            covered = _range_is_covered(start, end, read_ranges)
-            if not covered:
-                errors.append(
-                    f"{prefix} range {path}:{start}-{end} was not fully read during this run"
-                )
-        checked.append(
-            {
-                "index": index,
-                "path": path,
-                "start_line": start,
-                "end_line": end,
-                "path_exists": exists,
-                "covered_by_read_file": covered,
-            }
-        )
-
-    return {
-        "schema_version": "candidate-provenance-validation/v1",
-        "generated_at": utc_now(),
-        "valid": not errors,
-        "errors": errors,
-        "checked_references": checked,
-        "evidence_policy": (
-            "every cited interval must be fully covered by read_file evidence "
-            "from this run"
-        ),
-    }
-
-
-def write_candidate_artifacts(
-    run_directory: Path,
-    response: str,
-    *,
-    target_root: Path,
-    evidence_manifest: dict[str, Any],
-    audit_mode: str,
-    expected_property_id: str | None,
-    allowed_requirement_ids: list[str] | None = None,
-) -> CandidateArtifacts:
-    candidate, parse_recoverable, strict_output_compliant, parse_errors, warnings = (
-        extract_json_object(response)
-    )
-    validation_errors = list(parse_errors)
-    if candidate is not None:
-        errors, schema_warnings = validate_candidate_format(
-            candidate,
-            audit_mode=audit_mode,
-            expected_property_id=expected_property_id,
-            allowed_requirement_ids=allowed_requirement_ids,
-        )
-        validation_errors.extend(errors)
-        warnings.extend(schema_warnings)
-
-    schema_valid = candidate is not None and not validation_errors
-    format_validation = {
-        "schema_version": "candidate-format-validation/v1",
-        "generated_at": utc_now(),
-        "valid": schema_valid,
-        "parse_recoverable": parse_recoverable,
-        "strict_output_compliant": strict_output_compliant,
-        "schema_valid": schema_valid,
-        "errors": validation_errors,
-        "warnings": warnings,
-        "audit_mode": audit_mode,
-        "expected_property_id": expected_property_id,
-    }
-    if audit_mode == "prepared":
-        format_validation["allowed_requirement_ids"] = allowed_requirement_ids
-    write_json(run_directory / "candidate-format-validation.json", format_validation)
-
-    if not schema_valid:
-        write_json(
-            run_directory / "candidate-provenance-validation.json",
-            {
-                "schema_version": "candidate-provenance-validation/v1",
-                "generated_at": utc_now(),
-                "valid": False,
-                "skipped": True,
-                "errors": ["provenance validation skipped because Candidate-v0 format is invalid"],
-                "checked_references": [],
-            },
-        )
-        return CandidateArtifacts("invalid_output", parse_recoverable, strict_output_compliant, False, False, None)
-
-    write_json(run_directory / "parsed-candidate.json", candidate)
-    provenance = validate_candidate_provenance(
-        candidate,
-        target_root=target_root,
-        evidence_manifest=evidence_manifest,
-    )
-    write_json(run_directory / "candidate-provenance-validation.json", provenance)
-    return CandidateArtifacts(
-        str(candidate["status"]),
-        parse_recoverable,
-        strict_output_compliant,
-        True,
-        bool(provenance["valid"]),
-        "parsed-candidate.json",
-    )
-
-
-class CandidateRevalidationError(ValueError):
-    """Raised when an existing run cannot be revalidated."""
-
-
-def _load_json_object(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise CandidateRevalidationError(f"cannot read JSON object {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise CandidateRevalidationError(f"expected a JSON object in {path}")
+            start = text.find("{")
+            require(start >= 0, "response is not a JSON object")
+            value = json.loads(text[start:])
+    require(isinstance(value, dict), "stage output must be a JSON object")
     return value
 
 
-def revalidate_candidate_artifacts(run_directory: Path) -> CandidateArtifacts:
-    run = run_directory.resolve()
-    if not run.is_dir():
-        raise CandidateRevalidationError(f"run directory does not exist: {run}")
-    request = _load_json_object(run / "request.json")
-    evidence_manifest = _load_json_object(run / "evidence-manifest.json")
-    try:
-        response = (run / "response.md").read_text(encoding="utf-8")
-    except OSError as exc:
-        raise CandidateRevalidationError(f"cannot read response.md in {run}: {exc}") from exc
-    target_root = request.get("target_root")
-    audit_mode = request.get("audit_mode")
-    if not isinstance(target_root, str) or not target_root:
-        raise CandidateRevalidationError("request.json has no target_root")
-    if not isinstance(audit_mode, str) or not audit_mode:
-        raise CandidateRevalidationError("request.json has no audit_mode")
-    expected_property_id = request.get("property_id")
-    if expected_property_id is not None and not isinstance(expected_property_id, str):
-        raise CandidateRevalidationError("request.json property_id must be a string or null")
+def validate_code_refs(refs: Any, *, target_root: Path, evidence: dict[str, Any]) -> None:
+    require(isinstance(refs, list), "code references must be an array")
+    ranges = {entry["path"]: entry["ranges"] for entry in evidence["files"]["read"]}
+    root = target_root.resolve()
+    for ref in refs:
+        require(isinstance(ref, dict), "code reference must be an object")
+        path = ref.get("path")
+        require(nonempty(path), "code reference needs a path")
+        relative = Path(path)
+        require(not relative.is_absolute() and not {"..", ".git"}.intersection(relative.parts),
+                f"invalid target-relative path: {path}")
+        resolved = (root / relative).resolve()
+        require(resolved.is_relative_to(root) and ".git" not in resolved.relative_to(root).parts
+                and resolved.is_file(), f"code path missing or escapes target: {path}")
+        start, end = ref.get("start_line"), ref.get("end_line")
+        require(type(start) is int and type(end) is int and 1 <= start <= end, "invalid code interval")
+        cursor = start
+        for interval in sorted(ranges.get(path, []), key=lambda r: r["start"]):
+            if interval["start"] > cursor:
+                break
+            cursor = max(cursor, interval["end"] + 1)
+        require(cursor > end, f"code interval was not read in this task: {path}:{start}-{end}")
 
-    artifacts = write_candidate_artifacts(
-        run,
-        response,
-        target_root=Path(target_root),
-        evidence_manifest=evidence_manifest,
-        audit_mode=audit_mode,
-        expected_property_id=expected_property_id,
-        allowed_requirement_ids=request.get("requirement_ids"),
-    )
-    summary_path = run / "summary.json"
-    if summary_path.is_file():
-        summary = _load_json_object(summary_path)
-        summary.update(
-            {
-                "candidate_status": artifacts.status,
-                "candidate_format_valid": artifacts.format_valid,
-                "candidate_provenance_valid": artifacts.provenance_valid,
-                "parsed_candidate_file": artifacts.parsed_file,
-                "candidate_revalidated_at": utc_now(),
-            }
-        )
-        write_json(summary_path, summary)
-    return artifacts
+
+def string_list(value: Any, field: str, *, minimum: int = 0) -> None:
+    require(isinstance(value, list) and len(value) >= minimum and all(nonempty(v) for v in value),
+            f"{field} must be a string array with at least {minimum} entries")
+
+
+def unchecked_result(task: dict[str, Any], reason: str) -> dict[str, Any]:
+    return {"task_id": task["task_id"], "candidates": [],
+            "requirement_results": [{"requirement_id": r["id"], "status": "not_checked", "candidate_ids": [],
+                                     "note": reason} for r in task["requirements"]], "unresolved": [reason]}
+
+
+def validate_task_result(data: dict[str, Any], task: dict[str, Any], bundle: dict[str, Any], *,
+                         target_root: Path, evidence: dict[str, Any]) -> None:
+    require(data.get("task_id") == task["task_id"], "wrong task_id in audit result")
+    expected = {r["id"] for r in task["requirements"]}
+    candidates = data.get("candidates")
+    results = data.get("requirement_results")
+    require(isinstance(candidates, list) and isinstance(results, list), "candidates and requirement_results must be arrays")
+    candidate_refs: dict[str, set[str]] = {}
+    for candidate in candidates:
+        require(isinstance(candidate, dict), "candidate must be an object")
+        cid = candidate.get("id")
+        require(nonempty(cid) and cid not in candidate_refs, "duplicate/invalid candidate ID")
+        ids = candidate.get("requirement_ids")
+        string_list(ids, "requirement_ids", minimum=1)
+        require(len(ids) == len(set(ids)) and set(ids) <= expected, "candidate references unknown/duplicate requirements")
+        candidate_refs[cid] = set(ids)
+        require(nonempty(candidate.get("summary")), "candidate needs a summary")
+        refs = candidate.get("source_evidence")
+        validate_code_refs(refs, target_root=target_root, evidence=evidence)
+        require(bool(refs) and all(nonempty(r.get("claim")) for r in refs), "candidate needs inspected source claims")
+        mechanism = candidate.get("mechanism")
+        require(isinstance(mechanism, dict) and all(nonempty(mechanism.get(k))
+                for k in ("violated_obligation", "decisive_relation")), "candidate needs an obligation and decisive mechanism")
+        string_list(candidate.get("causal_chain"), "causal_chain", minimum=2)
+        sketch = candidate.get("test_sketch")
+        require(isinstance(sketch, dict) and all(nonempty(sketch.get(k))
+                for k in ("precondition", "violation", "oracle")), "candidate needs P/V/O")
+        string_list(sketch.get("actions"), "test_sketch.actions", minimum=1)
+        string_list(candidate.get("uncertainties"), "uncertainties")
+    seen = set()
+    for result in results:
+        require(isinstance(result, dict), "requirement result must be an object")
+        rid = result.get("requirement_id")
+        require(isinstance(rid, str) and rid in expected and rid not in seen, "unknown/duplicate requirement result")
+        seen.add(rid)
+        status = result.get("status")
+        require(status in ("candidate_found", "no_candidate", "insufficient_evidence", "not_checked", "not_applicable"),
+                "invalid requirement status")
+        cids = result.get("candidate_ids")
+        string_list(cids, "candidate_ids")
+        require(len(cids) == len(set(cids)), "duplicate candidate_ids")
+        linked = {cid for cid, rids in candidate_refs.items() if rid in rids}
+        require(set(cids) == linked, "candidate/requirement links disagree")
+        require(status == "not_checked" or bool(cids) == (status == "candidate_found"),
+                "candidate_found must correspond to linked candidates")
+        require(isinstance(result.get("note"), str), "requirement result needs a note")
+        if status != "candidate_found":
+            require(nonempty(result["note"]), f"{status} needs a reason or inspection note")
+        if status == "not_applicable":
+            validate_refs(result.get("source_refs"), bundle)
+        if "source_evidence" in result:
+            validate_code_refs(result["source_evidence"], target_root=target_root, evidence=evidence)
+    unresolved = data.setdefault("unresolved", [])
+    string_list(unresolved, "unresolved")
+    # Omission is not success. Even if a candidate mentioned this requirement,
+    # its missing processing record remains not_checked and is flagged below.
+    for rid in sorted(expected - seen):
+        note = "The model omitted this requirement's processing record; no completed check is inferred."
+        results.append({"requirement_id": rid, "status": "not_checked",
+                        "candidate_ids": [cid for cid, rids in candidate_refs.items() if rid in rids], "note": note})
+        unresolved.append(f"{rid}: {note}")
