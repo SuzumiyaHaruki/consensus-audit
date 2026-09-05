@@ -1,0 +1,29 @@
+Based on my complete causal-slice inspection, I'll now finalize my verdict.
+
+**Assessment summary.** I audited Q-LOG-2 (log matching) by tracing the full mechanism chain that must sustain it:
+
+1. **Unique origin per (index, term):** `appendEntry` (raft.go:815-847) assigns `Index = lastIndex+1`, `Term = r.Term`; leaders append only current-term entries at their tail and never truncate their own log. The `entryID` doc (types.go:23-31) records the design assumption "there can only be one leader at any term."
+2. **Content-preserving copy path:** followers accept a batch only after `matchTerm(prev)` (log.go:452-458, 107-136) and truncate only from the first *term*-conflict (`findConflict`, log.go:159-172); committed-region truncation is panic-guarded (log.go:125-127) and appends below committed are short-circuited (raft.go:1791-1794). Divergent tails resolve via rejection hints (`findConflictByTerm`, raft.go:1818-1827, 1505-1508).
+3. **Election-safety guards:** one-vote-per-term via `r.Vote`; vote/append responses are durability-gated in `send()` (raft.go:544-599) through `msgsAfterAppend` and published only after storage completion (rawnode.go:165-262); self-vote is tallied only post-durable (raft.go:1052-1060); real-majority `VoteWon` quorum (tracker/tracker.go:249-281, quorum/majority.go).
+4. **Async-storage ABA** is handled by term-tagged storage responses and `stableTo` term checks (rawnode.go:264-360; log_unstable.go:134-160).
+
+A Q-LOG-2 violation requires two distinct entries to share an (index, term) — i.e., two leaders of the *same* term each producing an entry at the same index — and then a follower keeping the divergent content because `findConflict`/`maybeAppend` compare only terms, never payload/kind. No inspected source path produces that precondition under fixed membership, non-Byzantine storage honoring the Ready/storage contracts, and the crash model; every route to same-term double leadership is gated by durable-vote ordering, and every overwrite of an existing entry is from a strictly higher term, so per-node (index,term)→content is monotone and stable.
+
+```json
+{
+  "status": "no_candidate",
+  "property_id": "Q-LOG-2",
+  "property_statement": "For any completed states of nodes a and b, if LogicalLog(a) and LogicalLog(b) contain entries with the same entry term at the same index i, then their logical prefixes through i contain identical Entry(index,term,kind,payload) values in the same order.",
+  "summary": "Audited the causally sufficient slice for Q-LOG-2: follower append acceptance and conflict handling (log.go maybeAppend/matchTerm/findConflict, lines 107-172 and 452-458), unstable truncation/stability (log_unstable.go truncateAndAppend/stableTo, lines 128-218), leader replication and rejection-hint machinery (raft.go handleAppendEntries lines 1786-1828, stepLeader rejection handling lines 1382-1508, maybeSendAppend lines 616-660), the async-storage durability gating and ABA guards (rawnode.go lines 165-360, raft.go send/msgsAfterAppend lines 540-599, stableTo), and election/quorum accounting (raft.go step vote handling lines 1204-1254, campaign lines 1025-1073, tracker.RecordVote/TallyVotes, quorum/majority.go). The property's decisive relation is that (index,term) must identify unique log content, which is enforced structurally: appendEntry assigns Index=lastIndex+1 with Term=r.Term and a leader never truncates its own log (raft.go 815-847, 933-971), so every (i,t) entry has a single origin in the unique term-t leader; followers accept only after prev-term matching and truncate only from the first term-conflict, never inside the committed region (log.go 107-136, 125-127; raft.go 1791-1794); divergent tails converge via rejection hints. A content collision at equal (index,term) would require two leaders of the same term to each produce an entry at the same index, i.e., an election-safety breach; all inspected paths to that state are gated by durable-vote ordering of vote/append responses and by real-majority quorum arithmetic, and overwrites of an existing entry always come from a strictly higher term. I found no executable mechanism by which the inspected source can place two distinct entries at the same (index,term) or yield equal-(index,term) divergent prefixes under the fixed-membership, non-Byzantine fault model with storage honoring the Ready/MsgStorageAppend ordering contract. This is a null result for this run and is not a proof of correctness.",
+  "source_evidence": [],
+  "mechanism": null,
+  "causal_chain": [],
+  "test_sketch": null,
+  "uncertainties": [
+    "No execution or harness was available; conclusions rest on static inspection of the append/conflict/durability paths.",
+    "The only theoretical route to a Q-LOG-2 violation is two distinct entries sharing one (index,term), which requires same-term double leadership; this implementation gates that precondition behind durable-vote ordering (send()/msgsAfterAppend and Ready/MsgStorageAppend response ordering) and real-majority quorums. A scenario would require a caller to publish a vote response (or self-vote) before the corresponding HardState is durable, or a storage layer that loses a persisted term while retaining/losing parts of the hard state or log non-atomically - both outside the inspected library obligations and the fault model's no-torn-writes scope.",
+    "Membership is fixed and joint-configuration/confchange paths were not exhaustively re-audited; the quorum code inspected (majority.go, tracker.go) computes standard majority thresholds over the fixed voter set.",
+    "Content identity is enforced only structurally (term-based matching in findConflict/maybeAppend never compares payload or kind), so any hypothetical upstream content collision (e.g., from a second same-term leader) would go undetected; reachability of such a collision was not established from inspected source."
+  ]
+}
+```

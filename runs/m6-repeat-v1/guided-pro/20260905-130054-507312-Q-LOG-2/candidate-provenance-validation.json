@@ -1,0 +1,41 @@
+{
+  "schema_version": "candidate-provenance-validation/v1",
+  "generated_at": "2026-09-05T05:07:38.431265+00:00",
+  "valid": true,
+  "errors": [],
+  "checked_references": [
+    {
+      "index": 0,
+      "path": "log.go",
+      "start_line": 105,
+      "end_line": 136,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 1,
+      "path": "raft.go",
+      "start_line": 1786,
+      "end_line": 1798,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 2,
+      "path": "raft.go",
+      "start_line": 1510,
+      "end_line": 1524,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 3,
+      "path": "tracker/progress.go",
+      "start_line": 205,
+      "end_line": 213,
+      "path_exists": true,
+      "covered_by_read_file": true
+    }
+  ],
+  "evidence_policy": "every cited interval must be fully covered by read_file evidence from this run"
+}

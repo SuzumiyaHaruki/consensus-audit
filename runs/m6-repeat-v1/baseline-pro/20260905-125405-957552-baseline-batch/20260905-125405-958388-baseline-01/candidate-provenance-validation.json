@@ -1,0 +1,49 @@
+{
+  "schema_version": "candidate-provenance-validation/v1",
+  "generated_at": "2026-09-05T05:00:50.757347+00:00",
+  "valid": true,
+  "errors": [],
+  "checked_references": [
+    {
+      "index": 0,
+      "path": "rawnode.go",
+      "start_line": 141,
+      "end_line": 147,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 1,
+      "path": "rawnode.go",
+      "start_line": 445,
+      "end_line": 450,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 2,
+      "path": "log.go",
+      "start_line": 225,
+      "end_line": 249,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 3,
+      "path": "log.go",
+      "start_line": 268,
+      "end_line": 278,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 4,
+      "path": "node.go",
+      "start_line": 89,
+      "end_line": 96,
+      "path_exists": true,
+      "covered_by_read_file": true
+    }
+  ],
+  "evidence_policy": "every cited interval must be fully covered by read_file evidence from this run"
+}

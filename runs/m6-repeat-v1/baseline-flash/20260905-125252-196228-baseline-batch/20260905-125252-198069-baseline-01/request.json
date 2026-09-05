@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-09-05T04:52:52.197705+00:00",
+  "audit_mode": "matched-no-property",
+  "baseline_episode": 1,
+  "material_set": "raft-etcd-v1",
+  "material_files": [
+    "fault-models/crash-recovery-cft.md",
+    "protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md",
+    "common/AUDIT_TASK.md",
+    "protocols/raft/PROTOCOL_CONTEXT.md",
+    "protocols/raft/EVENT_SEMANTICS.md",
+    "common/REPORT_TEMPLATE.md"
+  ],
+  "target_root": "/home/nitro/Desktop/experiments-etcd-raft/target-v6",
+  "allow_tests": false,
+  "max_turns": 24,
+  "max_tool_calls": 80,
+  "dry_run": false,
+  "model": {
+    "provider": "deepseek-official",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "reasoning_effort": "high",
+    "max_output_tokens": 32768,
+    "request_timeout_seconds": 600.0,
+    "max_retries": 2,
+    "max_turns": 24,
+    "max_tool_calls": 80
+  }
+}

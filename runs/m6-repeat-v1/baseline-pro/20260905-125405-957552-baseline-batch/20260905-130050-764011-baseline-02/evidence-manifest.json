@@ -1,0 +1,359 @@
+{
+  "schema_version": "evidence-manifest/v1",
+  "generated_at": "2026-09-05T05:06:45.629083+00:00",
+  "source_event_log": "events.jsonl",
+  "audit_mode": "matched-no-property",
+  "target_root": "/home/nitro/Desktop/experiments-etcd-raft/target-v6",
+  "property_id": null,
+  "baseline_episode": 2,
+  "tool_calls": {
+    "total": 28,
+    "successful": 28,
+    "failed": 0,
+    "by_tool": {
+      "list_files": 1,
+      "read_file": 20,
+      "search_code": 7
+    }
+  },
+  "shared_evidence": {
+    "new": 0,
+    "reused": 0,
+    "ids": []
+  },
+  "files": {
+    "read": [
+      {
+        "path": "log.go",
+        "read_calls": 3,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 581
+          }
+        ]
+      },
+      {
+        "path": "log_test.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 200,
+            "end": 360
+          }
+        ]
+      },
+      {
+        "path": "log_unstable.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 245
+          }
+        ]
+      },
+      {
+        "path": "node.go",
+        "read_calls": 2,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 615
+          }
+        ]
+      },
+      {
+        "path": "quorum/majority.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 196
+          }
+        ]
+      },
+      {
+        "path": "raft.go",
+        "read_calls": 7,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2070
+          },
+          {
+            "start": 2080,
+            "end": 2158
+          }
+        ]
+      },
+      {
+        "path": "rawnode.go",
+        "read_calls": 2,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 563
+          }
+        ]
+      },
+      {
+        "path": "testdata/lagging_commit.txt",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 174
+          }
+        ]
+      },
+      {
+        "path": "tracker/tracker.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 281
+          }
+        ]
+      },
+      {
+        "path": "util.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 300
+          }
+        ]
+      }
+    ],
+    "matched_by_search": [
+      {
+        "path": "log.go",
+        "search_calls": 3,
+        "matched_line_numbers": [
+          105,
+          107,
+          117,
+          118
+        ],
+        "also_read": true
+      },
+      {
+        "path": "log_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          293,
+          312
+        ],
+        "also_read": true
+      },
+      {
+        "path": "node_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          537,
+          671,
+          818,
+          822,
+          872,
+          881
+        ],
+        "also_read": false
+      },
+      {
+        "path": "raft.go",
+        "search_calls": 3,
+        "matched_line_numbers": [
+          498,
+          500,
+          502,
+          512,
+          603,
+          616,
+          664,
+          692,
+          712,
+          722,
+          731,
+          740,
+          769,
+          778,
+          784,
+          815,
+          850,
+          862,
+          891,
+          902,
+          917,
+          933,
+          964,
+          966,
+          973,
+          995,
+          1025,
+          1075,
+          1085,
+          1786,
+          1795,
+          1830,
+          1835,
+          1857,
+          1942,
+          1947,
+          1975,
+          2033,
+          2045,
+          2049,
+          2053,
+          2057,
+          2062,
+          2070,
+          2094,
+          2102,
+          2112
+        ],
+        "also_read": true
+      },
+      {
+        "path": "raft_snap_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          118
+        ],
+        "also_read": false
+      },
+      {
+        "path": "raft_test.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          175,
+          274,
+          862,
+          903,
+          955,
+          985,
+          2173,
+          3140
+        ],
+        "also_read": false
+      },
+      {
+        "path": "rawnode_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          91,
+          569,
+          570,
+          833
+        ],
+        "also_read": false
+      },
+      {
+        "path": "util_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          145,
+          146
+        ],
+        "also_read": false
+      }
+    ],
+    "search_only": [
+      "node_test.go",
+      "raft_snap_test.go",
+      "raft_test.go",
+      "rawnode_test.go",
+      "util_test.go"
+    ]
+  },
+  "source_cost": {
+    "files_read": 10,
+    "unique_source_lines_read": 5265,
+    "search_calls": 7
+  },
+  "searches": [
+    {
+      "turn": 3,
+      "pattern": "^func \\(r \\*raft\\) ",
+      "path": "raft.go",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 43,
+      "truncated": false
+    },
+    {
+      "turn": 14,
+      "pattern": "check\\[0\\].Index == l.lastIndex",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 1,
+      "truncated": false
+    },
+    {
+      "turn": 14,
+      "pattern": "len\\(check\\[0\\].Data\\) == 0",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 1,
+      "truncated": false
+    },
+    {
+      "turn": 15,
+      "pattern": "empty entry",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 19,
+      "truncated": false
+    },
+    {
+      "turn": 16,
+      "pattern": "maybeAppend",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 5,
+      "truncated": false
+    },
+    {
+      "turn": 23,
+      "pattern": "Data:",
+      "path": "log_test.go",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 0,
+      "truncated": false
+    },
+    {
+      "turn": 23,
+      "pattern": "empty",
+      "path": "raft_test.go",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 8,
+      "truncated": false
+    }
+  ],
+  "list_operations": [
+    {
+      "turn": 1,
+      "path": ".",
+      "max_depth": 2,
+      "files_returned": 162,
+      "truncated": false
+    }
+  ],
+  "tests": [],
+  "tool_errors": []
+}

@@ -21,6 +21,8 @@ The two modes otherwise have the same source access, protocol context, event sem
 
 The mechanism is the primary result. A detailed scenario without a valid source mechanism is not a useful candidate. Conversely, do not conceal an otherwise well-supported mechanism merely because integration code or execution evidence would still be needed to confirm reachability; record that limitation in `uncertainties`.
 
+Scenario reachability may remain uncertain, but explain how the scenario, if it occurs, contradicts a property grounded in the protocol guarantees. Do not define a preferred implementation ordering as a new property and treat its absence alone as a protocol violation. If the protocol consequence itself remains unsupported, the candidate has not met the `candidate_found` threshold.
+
 ## Evidence and scope rules
 
 - Use only the tools exposed by the runner and do not modify the source tree.

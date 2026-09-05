@@ -14,7 +14,7 @@ from .materials import (
     build_audit_prompt,
     build_baseline_prompt,
 )
-from .report import write_candidate_artifacts
+from .report import extract_json_object, write_candidate_artifacts
 from .shared_context import SharedAuditContext
 from .workspace import SourceWorkspace
 
@@ -61,13 +61,6 @@ request more checks or tools, return Markdown prose, respond with a plan, or
 emit tool-call syntax such as XML/DSML tags. The first output character must be
 `{` and the last must be `}`.
 """
-
-
-def _is_strict_json_object(content: str) -> bool:
-    try:
-        return isinstance(json.loads(content), dict)
-    except json.JSONDecodeError:
-        return False
 
 
 SHARED_EVIDENCE_INSTRUCTION = """\
@@ -362,8 +355,14 @@ def _run_prompt(
                 )
 
             raw_candidate = response.content.strip()
-            if not final_output_turn and not _is_strict_json_object(raw_candidate):
+            if not final_output_turn and extract_json_object(raw_candidate)[0] is None:
                 messages.append(response.assistant_message())
+                messages.append({
+                    "role": "user",
+                    "content": "Reformat the preceding result as Candidate-v0 JSON. "
+                    "Preserve its mechanism, evidence, and uncertainties; do not "
+                    "start a new investigation or invent missing evidence.",
+                })
                 format_recovery_pending = True
                 events.append("candidate_format_recovery", turn=turn)
                 continue

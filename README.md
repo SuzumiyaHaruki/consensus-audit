@@ -235,6 +235,8 @@ consensus-audit revalidate-candidate \
   --run-directory /path/to/run
 ```
 
+提前结束时，可机械提取的 JSON 直接进入 schema/provenance 校验，保留原始输出和非严格格式标记；只有无法提取 JSON 对象且尚有轮次时，才进行一次禁止工具调用的模型格式恢复，其用量计入原有预算。正式重复实验前应先提交本次代码和材料修改，并在实验记录中注明该提交；旧实验不会回填当前版本号。
+
 `evidence-manifest.json` 不使用模型的自我描述，而是从 `events.jsonl` 重建：哪些文件真正读取了哪些区间、哪些文件只是搜索命中、运行了哪些测试、哪些工具调用失败。旧运行可以回填：
 
 ```bash

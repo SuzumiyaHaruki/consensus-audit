@@ -43,7 +43,7 @@ class CandidateArtifacts:
         return self.schema_valid
 
 
-def _extract_json_object(
+def extract_json_object(
     response: str,
 ) -> tuple[dict[str, Any] | None, bool, bool, list[str], list[str]]:
     errors: list[str] = []
@@ -78,24 +78,15 @@ def _extract_json_object(
             errors.append("response contains multiple valid JSON code blocks")
             return None, False, False, errors, warnings
         else:
-            decoder = json.JSONDecoder()
-            prose_objects: list[dict[str, Any]] = []
-            for start in (match.start() for match in re.finditer(r"[{]", text)):
-                try:
-                    value, end = decoder.raw_decode(text[start:])
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(value, dict) and not text[start + end :].strip():
-                    prose_objects.append(value)
-            if len(prose_objects) == 1:
-                parsed = prose_objects[0]
-                warnings.append("extracted the unique JSON object following prose")
-            elif len(prose_objects) > 1:
-                errors.append("response contains multiple recoverable JSON objects")
-                return None, False, False, errors, warnings
-            else:
+            # Require the first opening brace through EOF to be one object;
+            # never silently select the last of several objects or a nested one.
+            try:
+                start = text.index("{")
+                parsed = json.loads(text[start:])
+            except ValueError:
                 errors.append(direct_error)
                 return None, False, False, errors, warnings
+            warnings.append("extracted the unique JSON object following prose")
         strict_output_compliant = False
         parse_recoverable = True
     else:
@@ -362,7 +353,7 @@ def write_candidate_artifacts(
     expected_property_id: str | None,
 ) -> CandidateArtifacts:
     candidate, parse_recoverable, strict_output_compliant, parse_errors, warnings = (
-        _extract_json_object(response)
+        extract_json_object(response)
     )
     validation_errors = list(parse_errors)
     if candidate is not None:

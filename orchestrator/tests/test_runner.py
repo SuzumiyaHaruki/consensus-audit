@@ -36,13 +36,13 @@ def final_candidate(*, property_id: str | None) -> str:
 
 class FakeClient:
     def __init__(
-        self, *, tool_until_final: bool = False, non_strict_early_output: bool = False
+        self, *, tool_until_final: bool = False, early_output: str | None = None
     ) -> None:
         self.calls: list[list[dict[str, Any]]] = []
         self.tool_sets: list[list[dict[str, Any]]] = []
         self.request_options: list[dict[str, Any]] = []
         self.tool_until_final = tool_until_final
-        self.non_strict_early_output = non_strict_early_output
+        self.early_output = early_output
 
     def create_chat_completion(
         self,
@@ -86,8 +86,8 @@ class FakeClient:
             if match is not None:
                 property_id = match.group(1)
         content = final_candidate(property_id=property_id)
-        if self.non_strict_early_output and len(self.calls) == 2:
-            content = "Candidate follows.\n" + content
+        if self.early_output is not None and len(self.calls) == 2:
+            content = self.early_output
         return ChatResponse(
             content=content,
             reasoning_content="No candidate met the evidence threshold.",
@@ -202,11 +202,11 @@ material_sets:
             )
             self.assertTrue((result.run_directory / "response.md").is_file())
 
-    def test_non_strict_early_output_gets_one_json_recovery_turn(self) -> None:
+    def test_unparseable_early_output_gets_one_json_recovery_turn(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             materials, target = self._fixture(root)
-            client = FakeClient(non_strict_early_output=True)
+            client = FakeClient(early_output="No candidate met the evidence threshold.")
 
             result = run_audit(
                 load_material_set(materials, "test"),
@@ -221,12 +221,37 @@ material_sets:
             )
 
             self.assertEqual(result.turns, 3)
+            self.assertEqual(result.tool_calls, 1)
+            self.assertEqual(result.usage["total_tokens"], 50)
             self.assertEqual(client.request_options[2]["tool_choice"], "none")
             self.assertEqual(
                 client.request_options[2]["response_format"], {"type": "json_object"}
             )
             events = (result.run_directory / "events.jsonl").read_text(encoding="utf-8")
             self.assertIn('"event_type": "candidate_format_recovery"', events)
+
+    def test_recoverable_early_output_needs_no_model_repair(self) -> None:
+        for wrapper in ("Candidate follows.\n{}", "```json\n{}\n```"):
+            with self.subTest(wrapper=wrapper), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                materials, target = self._fixture(root)
+                raw = wrapper.format(final_candidate(property_id="Q-TEST-1"))
+                client = FakeClient(early_output=raw)
+                result = run_audit(
+                    load_material_set(materials, "test"), client,
+                    RunConfig(property_id="Q-TEST-1", target_root=target,
+                              run_root=root / "runs", max_turns=4),
+                    model_metadata={"provider": "fake"},
+                )
+                self.assertEqual(len(client.calls), 2)
+                self.assertEqual(result.usage["total_tokens"], 30)
+                self.assertEqual(result.candidate_status, "no_candidate")
+                self.assertEqual(result.response, raw)
+                validation = json.loads(
+                    (result.run_directory / "candidate-format-validation.json").read_text()
+                )
+                self.assertFalse(validation["strict_output_compliant"])
+                self.assertTrue(validation["schema_valid"])
 
     def test_baseline_episode_uses_shared_agent_loop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

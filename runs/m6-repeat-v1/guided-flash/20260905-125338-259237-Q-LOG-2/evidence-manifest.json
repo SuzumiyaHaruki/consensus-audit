@@ -1,0 +1,549 @@
+{
+  "schema_version": "evidence-manifest/v1",
+  "generated_at": "2026-09-05T05:04:22.316889+00:00",
+  "source_event_log": "events.jsonl",
+  "audit_mode": "property-directed",
+  "target_root": "/home/nitro/Desktop/experiments-etcd-raft/target-v6",
+  "property_id": "Q-LOG-2",
+  "baseline_episode": null,
+  "tool_calls": {
+    "total": 28,
+    "successful": 28,
+    "failed": 0,
+    "by_tool": {
+      "list_files": 1,
+      "read_file": 21,
+      "search_code": 6
+    }
+  },
+  "shared_evidence": {
+    "new": 0,
+    "reused": 0,
+    "ids": []
+  },
+  "files": {
+    "read": [
+      {
+        "path": "log.go",
+        "read_calls": 6,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 480
+          },
+          {
+            "start": 504,
+            "end": 581
+          }
+        ]
+      },
+      {
+        "path": "log_unstable.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 245
+          }
+        ]
+      },
+      {
+        "path": "quorum/majority.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 120
+          }
+        ]
+      },
+      {
+        "path": "raft.go",
+        "read_calls": 9,
+        "ranges": [
+          {
+            "start": 540,
+            "end": 760
+          },
+          {
+            "start": 762,
+            "end": 1120
+          },
+          {
+            "start": 1150,
+            "end": 1740
+          },
+          {
+            "start": 1750,
+            "end": 1920
+          }
+        ]
+      },
+      {
+        "path": "rawnode.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 150,
+            "end": 360
+          }
+        ]
+      },
+      {
+        "path": "testdata/async_storage_writes_append_aba_race.txt",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 120
+          }
+        ]
+      },
+      {
+        "path": "tracker/tracker.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 260
+          }
+        ]
+      },
+      {
+        "path": "types.go",
+        "read_calls": 1,
+        "ranges": [
+          {
+            "start": 1,
+            "end": 106
+          }
+        ]
+      }
+    ],
+    "matched_by_search": [
+      {
+        "path": "bootstrap.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          74
+        ],
+        "also_read": false
+      },
+      {
+        "path": "confchange/confchange.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          263,
+          273,
+          276,
+          336,
+          349,
+          352
+        ],
+        "also_read": false
+      },
+      {
+        "path": "doc.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          265,
+          273,
+          387,
+          390
+        ],
+        "also_read": false
+      },
+      {
+        "path": "log.go",
+        "search_calls": 4,
+        "matched_line_numbers": [
+          39,
+          46,
+          108,
+          122,
+          126,
+          145,
+          149,
+          150,
+          152,
+          154,
+          156,
+          159,
+          161,
+          165,
+          174,
+          184,
+          187,
+          401,
+          452,
+          464,
+          504
+        ],
+        "also_read": true
+      },
+      {
+        "path": "log_test.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          190,
+          348
+        ],
+        "also_read": false
+      },
+      {
+        "path": "log_unstable.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          46,
+          133
+        ],
+        "also_read": true
+      },
+      {
+        "path": "node.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          64,
+          78,
+          85
+        ],
+        "also_read": false
+      },
+      {
+        "path": "node_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          867,
+          876,
+          886,
+          908,
+          924,
+          946
+        ],
+        "also_read": false
+      },
+      {
+        "path": "raft.go",
+        "search_calls": 5,
+        "matched_line_numbers": [
+          39,
+          160,
+          167,
+          169,
+          170,
+          653,
+          778,
+          815,
+          902,
+          933,
+          1025,
+          1071,
+          1075,
+          1102,
+          1156,
+          1158,
+          1162,
+          1189,
+          1191,
+          1213,
+          1384,
+          1386,
+          1404,
+          1406,
+          1418,
+          1501,
+          1781,
+          1800,
+          1805,
+          1807,
+          1813,
+          1817,
+          1819,
+          1826,
+          1908,
+          2062
+        ],
+        "also_read": true
+      },
+      {
+        "path": "raft_paper_test.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          100,
+          381,
+          382,
+          541,
+          573,
+          576,
+          624,
+          682,
+          699,
+          734
+        ],
+        "also_read": false
+      },
+      {
+        "path": "raft_test.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          399,
+          536,
+          1088,
+          1089,
+          1100,
+          1101,
+          1104,
+          1105,
+          1106,
+          1107,
+          1108,
+          1111,
+          1112,
+          1113,
+          1114,
+          1345,
+          1443,
+          2096,
+          2097,
+          2173,
+          2212,
+          3770,
+          3828,
+          3833,
+          3910
+        ],
+        "also_read": false
+      },
+      {
+        "path": "raftpb/raft.pb.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          94,
+          95,
+          121,
+          122,
+          413,
+          1009,
+          1298,
+          1908,
+          1910,
+          1920
+        ],
+        "also_read": false
+      },
+      {
+        "path": "rawnode.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          168,
+          169,
+          202,
+          205,
+          212,
+          214,
+          220,
+          225,
+          227,
+          249,
+          252,
+          258,
+          259,
+          264,
+          268,
+          270,
+          316,
+          317,
+          319,
+          320,
+          328,
+          330,
+          333,
+          345,
+          348,
+          349,
+          351,
+          359,
+          424,
+          425
+        ],
+        "also_read": true
+      },
+      {
+        "path": "state_trace.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          107,
+          139,
+          153
+        ],
+        "also_read": false
+      },
+      {
+        "path": "storage.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          75
+        ],
+        "also_read": false
+      },
+      {
+        "path": "storage_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          172
+        ],
+        "also_read": false
+      },
+      {
+        "path": "tracker/progress.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          37,
+          210
+        ],
+        "also_read": false
+      },
+      {
+        "path": "tracker/tracker.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          37,
+          39,
+          45,
+          59
+        ],
+        "also_read": true
+      },
+      {
+        "path": "types.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          27,
+          44,
+          45,
+          47,
+          62,
+          66
+        ],
+        "also_read": true
+      },
+      {
+        "path": "util.go",
+        "search_calls": 2,
+        "matched_line_numbers": [
+          35,
+          36,
+          48,
+          157
+        ],
+        "also_read": false
+      },
+      {
+        "path": "util_test.go",
+        "search_calls": 1,
+        "matched_line_numbers": [
+          96,
+          97,
+          133,
+          134
+        ],
+        "also_read": false
+      }
+    ],
+    "search_only": [
+      "bootstrap.go",
+      "confchange/confchange.go",
+      "doc.go",
+      "log_test.go",
+      "node.go",
+      "node_test.go",
+      "raft_paper_test.go",
+      "raft_test.go",
+      "raftpb/raft.pb.go",
+      "state_trace.go",
+      "storage.go",
+      "storage_test.go",
+      "tracker/progress.go",
+      "util.go",
+      "util_test.go"
+    ]
+  },
+  "source_cost": {
+    "files_read": 8,
+    "unique_source_lines_read": 2962,
+    "search_calls": 6
+  },
+  "searches": [
+    {
+      "turn": 1,
+      "pattern": "matchTerm|LogTerm|matchLog",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 68,
+      "truncated": false
+    },
+    {
+      "turn": 5,
+      "pattern": "newStorageAppendResp|StorageAppend|storageAppendRespMsg",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 60,
+      "truncated": true
+    },
+    {
+      "turn": 5,
+      "pattern": "truncateAndAppend|conflict|Conflict",
+      "path": ".",
+      "glob": "log.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 13,
+      "truncated": false
+    },
+    {
+      "turn": 8,
+      "pattern": "Invariant|invariant|checkLog|assertLogs|same index|matching|LogMatch",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 34,
+      "truncated": false
+    },
+    {
+      "turn": 11,
+      "pattern": "func \\(r \\*raft\\) becomeLeader|func \\(r \\*raft\\) becomeCandidate|func \\(r \\*raft\\) campaign|func \\(r \\*raft\\) poll|func \\(r \\*raft\\) appendEntry",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 5,
+      "truncated": false
+    },
+    {
+      "turn": 16,
+      "pattern": "func \\(l \\*raftLog\\) slice|func \\(l \\*raftLog\\) unstableEnts|func \\(r \\*raft\\) maybeCommit|func \\(r \\*raft\\) committedEntryInCurrentTerm",
+      "path": ".",
+      "glob": "*.go",
+      "fixed_strings": false,
+      "engine": "python-fallback",
+      "matches_returned": 3,
+      "truncated": false
+    }
+  ],
+  "list_operations": [
+    {
+      "turn": 1,
+      "path": ".",
+      "max_depth": 3,
+      "files_returned": 162,
+      "truncated": false
+    }
+  ],
+  "tests": [],
+  "tool_errors": []
+}

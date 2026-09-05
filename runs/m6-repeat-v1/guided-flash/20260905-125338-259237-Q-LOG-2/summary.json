@@ -1,0 +1,24 @@
+{
+  "completed_at": "2026-09-05T05:04:22.324348+00:00",
+  "duration_seconds": 644.064,
+  "turns": 18,
+  "tool_calls": 28,
+  "usage": {
+    "prompt_tokens": 1075887,
+    "completion_tokens": 72594,
+    "total_tokens": 1148481,
+    "prompt_cache_hit_tokens": 1009536,
+    "prompt_cache_miss_tokens": 66351
+  },
+  "response_file": "response.md",
+  "response_format": "candidate-v0-json",
+  "candidate_status": "no_candidate",
+  "candidate_format_valid": true,
+  "candidate_provenance_valid": true,
+  "parsed_candidate_file": "parsed-candidate.json",
+  "source_cost": {
+    "files_read": 8,
+    "unique_source_lines_read": 2962,
+    "search_calls": 6
+  }
+}

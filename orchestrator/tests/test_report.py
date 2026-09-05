@@ -207,6 +207,18 @@ class CandidateReportTests(unittest.TestCase):
             self.assertFalse(result.strict_output_compliant)
             self.assertTrue(result.schema_valid)
 
+    def test_rejects_multiple_bare_objects_instead_of_selecting_last(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary)
+            target, manifest = self._fixture(run)
+            result = write_candidate_artifacts(
+                run, "Candidate follows.\n{}\n" + json.dumps(candidate()),
+                target_root=target, evidence_manifest=manifest,
+                audit_mode="property-directed", expected_property_id="Q-TEST-1",
+            )
+            self.assertFalse(result.parse_recoverable)
+            self.assertEqual(result.status, "invalid_output")
+
     def test_revalidate_updates_existing_run_without_model_call(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             run = Path(temporary)

@@ -1,0 +1,9 @@
+run_directory,target_id,model,arm,run_id,candidate_status,parse_recoverable,strict_output_compliant,schema_valid,provenance_valid,input_tokens,output_tokens,total_tokens,cache_hit_tokens,cache_miss_tokens,turns,tool_calls,files_read,source_lines_read,duration_seconds,notes
+baseline-flash/20260905-125252-196228-baseline-batch/20260905-125252-198069-baseline-01,target-v6,deepseek-v4-flash,baseline,baseline-01,no_candidate,True,True,True,True,1612653,95024,1707677,1418368,194285,24,38,13,5346,855.335,
+baseline-flash/20260905-125252-196228-baseline-batch/20260905-130707-539210-baseline-02,target-v6,deepseek-v4-flash,baseline,baseline-02,candidate_found,True,False,True,True,1499337,57884,1557221,1409920,89417,22,33,14,5594,517.277,
+baseline-pro/20260905-125405-957552-baseline-batch/20260905-125405-958388-baseline-01,target-v6,deepseek-v4-pro,baseline,baseline-01,candidate_found,True,True,True,True,993014,23036,1016050,828672,164342,24,26,11,5038,404.8,
+baseline-pro/20260905-125405-957552-baseline-batch/20260905-130050-764011-baseline-02,target-v6,deepseek-v4-pro,baseline,baseline-02,candidate_found,True,True,True,True,1206665,19147,1225812,1038592,168073,24,28,10,5265,354.871,
+guided-flash/20260905-125338-259237-Q-LOG-2,target-v6,deepseek-v4-flash,guided,Q-LOG-2,no_candidate,True,False,True,True,1075887,72594,1148481,1009536,66351,18,28,8,2962,644.064,
+guided-flash/20260905-130422-749784-Q-LOG-2,target-v6,deepseek-v4-flash,guided,Q-LOG-2,candidate_found,True,True,True,True,1381116,63248,1444364,1235968,145148,24,35,12,4160,559.734,
+guided-pro/20260905-125535-539008-Q-LOG-2,target-v6,deepseek-v4-pro,guided,Q-LOG-2,insufficient_evidence,True,True,True,True,873967,17705,891672,746496,127471,24,29,6,3526,318.79,
+guided-pro/20260905-130054-507312-Q-LOG-2,target-v6,deepseek-v4-pro,guided,Q-LOG-2,candidate_found,True,True,True,True,1042566,21335,1063901,914432,128134,24,29,11,3571,403.922,
