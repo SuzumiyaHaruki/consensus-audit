@@ -1,0 +1,57 @@
+{
+  "schema_version": "candidate-provenance-validation/v1",
+  "generated_at": "2026-09-05T05:48:10.473811+00:00",
+  "valid": true,
+  "errors": [],
+  "checked_references": [
+    {
+      "index": 0,
+      "path": "log.go",
+      "start_line": 107,
+      "end_line": 136,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 1,
+      "path": "log.go",
+      "start_line": 138,
+      "end_line": 147,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 2,
+      "path": "log_unstable.go",
+      "start_line": 196,
+      "end_line": 218,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 3,
+      "path": "raft.go",
+      "start_line": 815,
+      "end_line": 846,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 4,
+      "path": "raft.go",
+      "start_line": 961,
+      "end_line": 965,
+      "path_exists": true,
+      "covered_by_read_file": true
+    },
+    {
+      "index": 5,
+      "path": "raft.go",
+      "start_line": 1786,
+      "end_line": 1797,
+      "path_exists": true,
+      "covered_by_read_file": true
+    }
+  ],
+  "evidence_policy": "every cited interval must be fully covered by read_file evidence from this run"
+}

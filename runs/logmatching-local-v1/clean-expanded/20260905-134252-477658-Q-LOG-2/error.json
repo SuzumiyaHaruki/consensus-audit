@@ -1,0 +1,14 @@
+{
+  "failed_at": "2026-09-05T05:49:52.804188+00:00",
+  "error_type": "AuditRunError",
+  "error": "model returned no final content (finish_reason='stop')",
+  "duration_seconds": 420.326,
+  "tool_calls": 23,
+  "usage": {
+    "prompt_tokens": 906917,
+    "completion_tokens": 22322,
+    "total_tokens": 929239,
+    "prompt_cache_hit_tokens": 795264,
+    "prompt_cache_miss_tokens": 111653
+  }
+}

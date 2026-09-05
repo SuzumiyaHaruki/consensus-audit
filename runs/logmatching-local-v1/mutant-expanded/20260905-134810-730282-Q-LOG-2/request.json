@@ -1,0 +1,33 @@
+{
+  "created_at": "2026-09-05T05:48:10.730101+00:00",
+  "audit_mode": "property-directed",
+  "material_set": "raft-etcd-logmatching-local-expanded-v1",
+  "material_files": [
+    "fault-models/crash-recovery-cft.md",
+    "protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md",
+    "protocols/raft/targets/etcd-raft/LOCAL_LOG_MATCHING_DIAGNOSTIC.md",
+    "common/AUDIT_TASK.md",
+    "protocols/raft/PROTOCOL_CONTEXT.md",
+    "protocols/raft/EVENT_SEMANTICS.md",
+    "common/REPORT_TEMPLATE.md",
+    "protocols/raft/properties/Q-LOG-2.md"
+  ],
+  "property_id": "Q-LOG-2",
+  "target_root": "/home/nitro/Desktop/experiments-etcd-raft/target-v6",
+  "allow_tests": false,
+  "max_turns": 24,
+  "max_tool_calls": 80,
+  "dry_run": false,
+  "model": {
+    "provider": "deepseek-official",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-pro",
+    "thinking": true,
+    "reasoning_effort": "high",
+    "max_output_tokens": 32768,
+    "request_timeout_seconds": 600.0,
+    "max_retries": 2,
+    "max_turns": 24,
+    "max_tool_calls": 80
+  }
+}
