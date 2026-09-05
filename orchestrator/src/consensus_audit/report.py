@@ -149,6 +149,7 @@ def validate_candidate_format(
     *,
     audit_mode: str,
     expected_property_id: str | None,
+    allowed_requirement_ids: list[str] | None = None,
 ) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -178,6 +179,13 @@ def validate_candidate_format(
     elif audit_mode == "matched-no-property":
         if property_id is not None:
             errors.append("property_id must be null in matched-no-property mode")
+    elif audit_mode == "prepared":
+        if not allowed_requirement_ids:
+            errors.append("prepared validation requires task requirement IDs")
+        elif property_id is not None and property_id not in allowed_requirement_ids:
+            errors.append("property_id must belong to this prepared task")
+        if status == "candidate_found" and property_id is None:
+            errors.append("prepared candidate_found requires a task requirement ID")
     else:
         errors.append(f"unsupported audit mode {audit_mode!r}")
 
@@ -351,6 +359,7 @@ def write_candidate_artifacts(
     evidence_manifest: dict[str, Any],
     audit_mode: str,
     expected_property_id: str | None,
+    allowed_requirement_ids: list[str] | None = None,
 ) -> CandidateArtifacts:
     candidate, parse_recoverable, strict_output_compliant, parse_errors, warnings = (
         extract_json_object(response)
@@ -361,6 +370,7 @@ def write_candidate_artifacts(
             candidate,
             audit_mode=audit_mode,
             expected_property_id=expected_property_id,
+            allowed_requirement_ids=allowed_requirement_ids,
         )
         validation_errors.extend(errors)
         warnings.extend(schema_warnings)
@@ -378,6 +388,8 @@ def write_candidate_artifacts(
         "audit_mode": audit_mode,
         "expected_property_id": expected_property_id,
     }
+    if audit_mode == "prepared":
+        format_validation["allowed_requirement_ids"] = allowed_requirement_ids
     write_json(run_directory / "candidate-format-validation.json", format_validation)
 
     if not schema_valid:
@@ -452,6 +464,7 @@ def revalidate_candidate_artifacts(run_directory: Path) -> CandidateArtifacts:
         evidence_manifest=evidence_manifest,
         audit_mode=audit_mode,
         expected_property_id=expected_property_id,
+        allowed_requirement_ids=request.get("requirement_ids"),
     )
     summary_path = run / "summary.json"
     if summary_path.is_file():

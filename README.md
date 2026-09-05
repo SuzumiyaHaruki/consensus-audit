@@ -2,24 +2,34 @@
 
 本项目研究：给定共识实现、协议材料、故障模型和可选的目标性质，LLM 能否以较低成本提出少量、源码支撑充分、值得进入后续测试的协议违例候选场景。Candidate 是面向测试的假设，不是已确认缺陷或可达性证明。
 
+支持两种使用流程：已有的 `run` / `baseline` 直接装配审计材料；新增的 prepared 流程先从原文提取要求，经人工审核后定位源码，再按规范操作组织审计。提供给 LLM 的提示词和材料均使用英文。
+
 ## 当前结构
 
 ```text
 consensus-audit/
 ├── README.md                         # 人类使用说明（不提供给 AI）
 ├── docs/
-│   └── architecture.md               # 总体分层和扩展约定
+│   ├── architecture.md               # 总体分层和扩展约定
+│   └── prepared-audit.md             # 材料导入、人工审核与 prepared 操作说明
+├── scripts/
+│   └── prepare_materials.py          # 公开材料获取、本地导入与 PDF 文本转换
 ├── evaluation/
 │   ├── oracles/                       # 不提供给模型的人工机制标注
 │   └── score-template.csv             # Candidate人工评分表
 ├── ir/
 │   └── README.md                      # Candidate-v0边界和后续阶段
 ├── orchestrator/
-│   ├── src/consensus_audit/           # 材料装配、工具循环、解析和证据校验
+│   ├── src/consensus_audit/           # 材料装配、提取、定位、审计及引用校验
 │   └── tests/                         # 不访问外部API的离线测试
+├── .cache/materials/                 # 本地原件、转换文本与材料包，不纳入 Git
 ├── pyproject.toml
 └── audit-specs/                      # 可组合的审计定义
     ├── catalog.yaml                  # 材料组合清单，由实验运行器读取
+    ├── sources.yaml                  # 原文来源、版本、许可及适用范围
+    ├── preparation/
+    │   ├── EXTRACT_REQUIREMENTS.md   # 独立的英文要求提取 Prompt
+    │   └── LOCATE_CODE.md            # 独立的英文代码定位 Prompt
     ├── common/
     │   ├── AUDIT_TASK.md             # 两个实验条件共用的发现任务
     │   └── REPORT_TEMPLATE.md        # Candidate-v0 JSON契约
@@ -38,9 +48,45 @@ consensus-audit/
                     └── TARGET_BOUNDARY.md # 两种审计共享的目标边界
 ```
 
-## 材料组合
+## 两阶段准备与 prepared 审计
 
-一次实验不把整个 `audit-specs` 目录交给 AI。运行器根据 `catalog.yaml` 装配共同材料，性质侧再额外加入一个 Q：
+```text
+协议原文 + 现有范围与故障模型
+  → extract-requirements → requirements.json 草稿
+  → 人工编辑 review_status
+  → locate-code → code-map.json
+  → prepared → 各 operation 的独立 Candidate-v0 审计
+```
+
+| 入口                             | 作用                                                  | 主要结果                                          |
+| -------------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
+| `scripts/prepare_materials.py` | 下载公开原件或导入本地材料，使用 Poppler 转换         | `source-bundle.json`，保留章节、页码及块内行号  |
+| `extract-requirements`         | 逐块提取，可补读关联材料；不开放目标源码工具          | `requirements.json`，新生成项强制为 `pending` |
+| `validate-requirements`        | 检查人工编辑后的结构、引用和漏块，显示审核状态        | 审核与待确认项汇总；不代表语义正确                |
+| `locate-code`                  | 只定位`accepted` 要求，按需读取目标版本的源码和契约 | `code-map.json`，包含位置、职责与未知依赖       |
+| `prepared`                     | 按 operation 分组，以映射为起点继续读取源码           | 独立 Candidate-v0 结果及任务汇总                  |
+
+在仓库根目录可先完成离线材料导入和提取输入装配：
+
+```bash
+export PYTHONPATH="$PWD/orchestrator/src"
+python3 scripts/prepare_materials.py
+python3 -m consensus_audit extract-requirements \
+  --materials .cache/materials/source-bundle.json \
+  --dry-run
+```
+
+材料转换需要系统安装 `pdftotext`（Poppler）。导入默认只读取本地缓存；增加 `--download` 可获取公开原件，也可用 `--raft-pdf`、`--dissertation-pdf` 等参数导入指定文件。缺失材料会记录为 `unresolved`，不会生成替代原文。来源和许可见 [来源清单](audit-specs/sources.yaml)。
+
+三个模型阶段均支持 `--dry-run`：只保存待发送输入，不读取 API key、不调用模型，也不生成伪造的成功结果。定位和 prepared 需要显式提供 `--target-root`；prepared 还需要实际定位生成的映射，定位 dry-run 不会产生可用于后续审计的 `code-map.json`。
+
+人工直接编辑要求文件，将已核对项的 `review_status` 设为 `accepted` 或 `rejected`，不确定项继续保持 `pending`。定位未找到代码时保留 `unresolved`；`located` 仅表示找到了相关位置，不表示实现正确。prepared 各任务上下文独立，允许补读外围依赖；Candidate 的 `property_id` 可以引用本任务任一已接受 requirement ID。未审核要求、未解决依赖及没有定位到代码的任务都会出现在汇总中。
+
+完整的审核步骤、三个阶段的运行命令、预算与成本选项见 [操作说明](docs/prepared-audit.md)。当前已完成材料整理、dry-run 和 fake-client 离线链路验证；真实目标路径、材料与协议解释仍需人工确认，尚未验证真实模型效果。
+
+## 原有模式的材料组合
+
+`run` 和 `baseline` 不把整个 `audit-specs` 目录交给 AI。运行器根据 `catalog.yaml` 装配共同材料，性质侧再额外加入一个 Q：
 
 ```text
 共同材料 = fault model + target boundary + task + protocol context + event semantics + Candidate-v0 contract
@@ -58,7 +104,7 @@ matched-no-property = 共同材料
 
 ## 盲测边界
 
-人工根因、mutation 说明、触发轨迹和历史结果不得放入 `audit-specs` 或目标源码树。当前人工机制卡位于 `evaluation/oracles`，材料装配器不会读取该目录；模型文件工具也只能访问 `TARGET_ROOT`。正式实验仍应保证运行环境不会把评价目录作为目标暴露给模型。
+人工根因、mutation 说明、触发轨迹和历史结果不得放入 `audit-specs` 或目标源码树。当前人工机制卡位于 `evaluation/oracles`，材料装配器不会读取该目录；定位和审计的源码工具只能访问 `TARGET_ROOT`。要求提取阶段仅开放读取已导入材料块的 `read_material`，不开放目标源码、评价资料或历史结果。正式实验仍应保证运行环境不会把评价目录作为目标暴露给模型。
 
 协议模型、执行器、评价器和实验结果也不应混入审计定义目录；后续扩展位置见 [架构说明](docs/architecture.md)。
 
@@ -77,16 +123,16 @@ reasoning_effort = high
 
 API key 从 `--api-key-file` 指定的 UTF-8 文本文件读取。文件必须只包含一个原始 key，可以带末尾换行，但不能包含变量名、引号或多个 key。key 内容不会写入 prompt、运行元数据或日志。
 
-模型通过受限工具自主检查 `TARGET_ROOT`：
+定位和审计模型通过受限工具自主检查 `TARGET_ROOT`：
 
 - `list_files`：枚举源码文件；
 - `search_code`：通过 ripgrep 搜索；
 - `read_file`：按行读取 UTF-8 文本；
-- `run_go_test`：默认不开放，只有显式指定 `--allow-tests` 才可使用。
+- `run_go_test`：仅原有 `run` / `baseline` 可通过显式指定 `--allow-tests` 开放；定位和 prepared 不执行测试。
 
 所有文件工具都限制在目标根目录内，并禁止读取 `.git`。
 
-模型一旦形成临时结论，最多再进行两次可能推翻该结论的源码工具调用。默认 24 轮预算中的最后一轮不再提供工具，模型必须返回一个状态为 `candidate_found`、`no_candidate` 或 `insufficient_evidence` 的 Candidate-v0 JSON 对象。程序验证格式和代码引用来源，但不判断机制语义是否正确。未指定 `--allow-tests` 时，提示会明确告知模型执行工具不可用。
+审计模型一旦形成临时结论，最多再进行两次可能推翻该结论的源码工具调用。审计最后一轮禁止调用工具，模型必须返回一个状态为 `candidate_found`、`no_candidate` 或 `insufficient_evidence` 的 Candidate-v0 JSON 对象。程序验证格式和代码引用来源，但不判断机制语义是否正确。原有模式默认 24 轮、80 次源码工具调用；新增的提取、定位及 prepared 默认每个块或操作任务 12 轮、40 次工具调用，均可通过参数调整。提取与定位使用各自的 JSON 输出约定，不套用 Candidate 终止指令或解析器。
 
 ## 使用方法
 
@@ -197,7 +243,17 @@ consensus-audit run \
 
 ## 运行产物
 
-每次运行在 `runs/<timestamp>-<property>/` 中保存：
+新增流程各自创建独立运行目录：
+
+| 阶段     | 顶层产物                                                    | 子任务记录                                                                |
+| -------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 提取     | `materials.json`、`requirements.json`、`summary.json` | 每块的`input.json`、`events.jsonl`、`response.md`、`summary.json` |
+| 定位     | `input.json`、`code-map.json`、`summary.json`         | 每组的输入、响应、工具轨迹、证据清单及用量                                |
+| prepared | `summary.json`，包含任务、待确认项及三阶段成本汇总        | 每个操作的独立审计记录和 Candidate 校验结果                               |
+
+上述生成结果仅在实际执行对应阶段后产生。dry-run 保存输入与状态记录，不产生要求、映射或 Candidate。格式失败、空响应和合法 `no_candidate` 会分别记录；有失败的块或任务不会使其他项从汇总中消失。没有显式提供价格时仅汇总已报告的 token 用量，金额保持为 null。
+
+原有性质审计每次在 `runs/<timestamp>-<property>/` 中保存：
 
 ```text
 request.json     非敏感运行配置

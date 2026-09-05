@@ -31,6 +31,8 @@ from .runner import (
 from .results import ResultCollectionError, write_result_csv
 from .report import CandidateRevalidationError, revalidate_candidate_artifacts
 from .shared_context import SharedAuditContext
+from .preparation_cli import add_preparation_parsers, preparation_command
+from .workspace import WorkspaceError
 
 
 def project_root() -> Path:
@@ -90,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="audit specification root (default: project audit-specs directory)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    add_preparation_parsers(subparsers, project_root())
 
     subparsers.add_parser("list-materials", help="List available material sets")
 
@@ -506,6 +509,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command in {"extract-requirements", "locate-code", "prepared", "validate-requirements"}:
+            raise SystemExit(preparation_command(args))
         if args.command == "list-materials":
             print(
                 json.dumps(
@@ -553,6 +558,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         AuditRunError,
         ResultCollectionError,
         CandidateRevalidationError,
+        WorkspaceError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc

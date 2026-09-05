@@ -236,6 +236,12 @@ def _run_prompt(
         f"# System\n\n{system_prompt}\n\n# User\n\n{user_prompt}",
         encoding="utf-8",
     )
+    if metadata.get("audit_mode") == "prepared":
+        write_json(run_directory / "input.json", {
+            "messages": [{"role": "system", "content": system_prompt},
+                         {"role": "user", "content": user_prompt}],
+            "tools": workspace.tool_definitions(),
+        })
 
     if config.dry_run:
         events.append("dry_run_prepared")
@@ -267,12 +273,15 @@ def _run_prompt(
                     "budget_notice",
                     turn=turn,
                     remaining_turns=config.max_turns - turn + 1,
+                    **({"content": LATE_BUDGET_NOTICE} if metadata.get("audit_mode") == "prepared" else {}),
                 )
             if final_output_turn:
                 messages.append(
                     {"role": "user", "content": FINAL_CANDIDATE_INSTRUCTION}
                 )
                 events.append("final_candidate_turn", turn=turn, tools_enabled=False)
+                if metadata.get("audit_mode") == "prepared":
+                    events.append("input_append", turn=turn, role="user", content=FINAL_CANDIDATE_INSTRUCTION)
                 format_recovery_pending = False
 
             request_tools = tools
@@ -365,6 +374,8 @@ def _run_prompt(
                 })
                 format_recovery_pending = True
                 events.append("candidate_format_recovery", turn=turn)
+                if metadata.get("audit_mode") == "prepared":
+                    events.append("input_append", turn=turn, role="user", content=messages[-1]["content"])
                 continue
             (run_directory / "response.md").write_text(
                 raw_candidate + "\n", encoding="utf-8"
@@ -382,6 +393,7 @@ def _run_prompt(
                     if metadata.get("property_id") is not None
                     else None
                 ),
+                allowed_requirement_ids=metadata.get("requirement_ids"),
             )
             write_json(
                 run_directory / "summary.json",

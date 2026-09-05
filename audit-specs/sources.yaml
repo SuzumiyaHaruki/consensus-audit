@@ -1,0 +1,53 @@
+# Source inventory. Version labels use existing publications/Git revisions.
+# This inventory is not itself a protocol requirement or an LLM instruction.
+sources:
+  - id: raft-extended
+    category: protocol
+    location: https://raft.github.io/raft.pdf
+    version: Extended Version, published May 20, 2014
+    license: No standalone redistribution license verified; keep original and conversion in local cache.
+    local: .cache/materials/raft.pdf
+    scope: Basic Raft, Figure 2 and global properties; retain the complete paper, including out-of-scope sections.
+  - id: dissertation
+    category: extension
+    location: https://github.com/ongardie/dissertation
+    version: 0c10ea1b53d73bf6d163bdde8e4141a1cbd8f36a (existing upstream Git revision)
+    license: Diego Ongaro, 2014; CC BY 3.0 US or CC BY 4.0 International; see repository LICENSE.
+    local: .cache/materials/dissertation.pdf
+    scope: Sections 3.8-3.10, 4.2.3, chapter 5, sections 6.4-6.4.1 and 9.6; variants and timing assumptions need review.
+  - id: dissertation-errata
+    category: extension
+    location: https://github.com/ongardie/dissertation/blob/0c10ea1b53d73bf6d163bdde8e4141a1cbd8f36a/README.md
+    version: Same dissertation Git revision
+    license: Same dissertation repository LICENSE.
+    local: .cache/materials/dissertation-README.md
+    scope: Original author errata, including lastApplied persistence; not a target-library contract.
+  - id: crash-recovery-cft
+    category: environment
+    location: audit-specs/fault-models/crash-recovery-cft.md
+    version: Working-tree version at material import (exact text included in bundle).
+    license: Existing project material.
+    local: audit-specs/fault-models/crash-recovery-cft.md
+    scope: Existing experiment fault model; not a quote from the paper.
+  - id: etcd-raft-boundary
+    category: experiment_config
+    location: audit-specs/protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md
+    version: Working-tree version at material import (exact text included in bundle).
+    license: Existing project material.
+    local: audit-specs/protocols/raft/targets/etcd-raft/TARGET_BOUNDARY.md
+    scope: Existing complete target scope; sync/async storage, both PreVote settings, snapshots, reads and transfer remain included.
+on_demand_sources:
+  - id: target-contracts
+    category: target_documentation
+    location: TARGET_ROOT/README*, doc.go, public type/interface/method/configuration comments
+    version: Actual target selected by --target-root; never substituted with upstream latest.
+    local: Read with existing target source tools during location/audit only.
+    scope: Relevant caller obligations, completion semantics, concurrency and responsibility boundaries.
+project_definitions:
+  - protocols/raft/PROTOCOL_CONTEXT.md
+  - protocols/raft/EVENT_SEMANTICS.md
+  - protocols/raft/properties/Q-*.md
+agent_instructions:
+  - preparation/EXTRACT_REQUIREMENTS.md
+  - preparation/LOCATE_CODE.md
+  - common/REPORT_TEMPLATE.md

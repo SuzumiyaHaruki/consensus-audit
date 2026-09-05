@@ -1,0 +1,15 @@
+{
+  "schema_version": "requirements/v1",
+  "generation": "synthetic_offline_fixture_with_simulated_human_review",
+  "requirements": [
+    {"id": "R-1", "operation": ["Persist", "Reply"], "category": "protocol_requirement", "applies_when": "A synthetic server replies.", "requirement": "Persist before replying.", "definitions": [], "source_refs": [{"block_id": "fixture:rules", "start_line": 1, "end_line": 1}], "origin": "explicit", "review_status": "accepted"},
+    {"id": "R-2", "operation": ["Reply"], "category": "protocol_requirement", "applies_when": "Completion is pending.", "requirement": "Wait for completion before replying.", "definitions": [], "source_refs": [{"block_id": "fixture:rules", "start_line": 2, "end_line": 2}], "origin": "explicit", "review_status": "accepted"},
+    {"id": "R-3", "operation": ["Recover"], "category": "protocol_requirement", "applies_when": "A synthetic server recovers.", "requirement": "Retain the completed value.", "definitions": [], "source_refs": [{"block_id": "fixture:rules", "start_line": 3, "end_line": 3}], "origin": "explicit", "review_status": "pending"}
+  ],
+  "assumptions": [],
+  "unresolved": [{"id": "U-1", "issue": "Recovery support still needs review in this fixture.", "source_refs": [], "review_status": "pending"}],
+  "block_results": [
+    {"block_id": "fixture:rules", "requirement_ids": ["R-1", "R-2", "R-3"], "reason": "Synthetic test requirements."},
+    {"block_id": "scope:config", "requirement_ids": [], "reason": "Scope configuration only."}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": "source-bundle/v1",
+  "generation": "synthetic_offline_fixture_not_protocol_evidence",
+  "sources": [
+    {"id": "fixture", "category": "protocol", "location": "synthetic fixture", "version": "fixture-v1", "license": "Project test fixture", "scope": "Only the synthetic offline test"},
+    {"id": "scope", "category": "experiment_config", "location": "synthetic fixture configuration", "version": "fixture-v1", "license": "Project test fixture", "scope": "Only the synthetic offline test"}
+  ],
+  "blocks": [
+    {"id": "fixture:rules", "source_id": "fixture", "section": "Synthetic rules", "page": null, "source_start_line": 1, "review_status": "pending", "text": "A synthetic server persists its value before replying.\nA synthetic server replies only after completion.\nAfter recovery it retains its completed value."},
+    {"id": "scope:config", "source_id": "scope", "section": "Synthetic scope", "page": null, "source_start_line": 1, "review_status": "pending", "text": "The test includes persistence, replies and recovery.\nDynamic membership is outside this synthetic scope."}
+  ],
+  "unresolved": ["Synthetic fixture only; not a Raft specification or model-generated result."]
+}
