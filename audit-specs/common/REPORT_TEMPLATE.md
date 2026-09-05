@@ -2,7 +2,6 @@
 
 Return one JSON object and no surrounding prose or Markdown fence:
 
-```json
 {
   "status": "candidate_found",
   "property_id": "Q-EXAMPLE-1",
@@ -38,7 +37,6 @@ Return one JSON object and no surrounding prose or Markdown fence:
     "A condition required by the scenario but not established by inspected source."
   ]
 }
-```
 
 For `property-directed`, `property_id` must equal the selected property ID. For `matched-no-property`, it must be `null`; use `property_statement` for the self-derived obligation.
 

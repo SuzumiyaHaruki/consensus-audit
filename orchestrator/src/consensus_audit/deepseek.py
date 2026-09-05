@@ -123,6 +123,9 @@ class DeepSeekClient:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        *,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": self.config.model,
@@ -132,6 +135,12 @@ class DeepSeekClient:
         }
         if tools:
             body["tools"] = tools
+        if tool_choice is not None:
+            if not tools:
+                raise DeepSeekError("tool_choice requires a non-empty tools list")
+            body["tool_choice"] = tool_choice
+        if response_format is not None:
+            body["response_format"] = response_format
         if self.config.thinking:
             body["thinking"] = {"type": "enabled"}
             body["reasoning_effort"] = self.config.reasoning_effort
@@ -143,8 +152,16 @@ class DeepSeekClient:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        *,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> ChatResponse:
-        body = self._request_body(messages, tools)
+        body = self._request_body(
+            messages,
+            tools,
+            response_format=response_format,
+            tool_choice=tool_choice,
+        )
         endpoint = self.config.base_url.rstrip("/") + "/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",

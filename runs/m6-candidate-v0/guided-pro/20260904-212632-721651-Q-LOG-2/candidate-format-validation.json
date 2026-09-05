@@ -1,7 +1,10 @@
 {
   "schema_version": "candidate-format-validation/v1",
-  "generated_at": "2026-09-04T13:31:34.610771+00:00",
+  "generated_at": "2026-09-05T03:42:17.839423+00:00",
   "valid": true,
+  "parse_recoverable": true,
+  "strict_output_compliant": true,
+  "schema_valid": true,
   "errors": [],
   "warnings": [],
   "audit_mode": "property-directed",

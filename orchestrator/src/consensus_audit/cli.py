@@ -524,7 +524,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 json.dumps(
                     {
                         "candidate_status": artifacts.status,
-                        "format_valid": artifacts.format_valid,
+                        "parse_recoverable": artifacts.parse_recoverable,
+                        "strict_output_compliant": artifacts.strict_output_compliant,
+                        "schema_valid": artifacts.schema_valid,
                         "provenance_valid": artifacts.provenance_valid,
                         "parsed_file": artifacts.parsed_file,
                     },

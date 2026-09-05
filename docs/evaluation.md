@@ -7,7 +7,7 @@
 ## 两个实验条件
 
 - `property-directed`：共同材料加一个相关 Q。
-- `matched-no-property`：共同材料完全相同，但不提供具体 Q，也不要求模型预先选择性质；模型先寻找代码支撑的具体机制，再表述或修正该机制所威胁的性质与实现义务。
+- `matched-no-property`：共同材料完全相同，但不提供或特权化具体 Q；模型可以在源码阅读中形成、修正或放弃临时性质假设，再表述其最终机制所威胁的性质与实现义务。
 
 两侧必须使用相同模型配置、源码工具、轮次、工具调用上限和最多一个 Candidate 的输出契约。单次比较是 top-1 优先级比较；重复运行通过显式 `--episodes N` 或重复 guided 运行完成，不能把多 episode baseline 与一次 guided 运行直接计算胜率。
 
@@ -15,7 +15,7 @@
 
 ## 自动校验与人工评分边界
 
-程序只判断 Candidate-v0 格式和源码引用来源。隐藏 evaluator 使用 `evaluation/oracles` 中的语义机制卡人工评分：
+程序输出纯机器事实 `runs.csv`，其中包括 Candidate 的 strict/recoverable/schema/provenance 状态和成本。隐藏 evaluator 在独立的 `annotations.csv` 中使用 `evaluation/oracles` 的语义机制卡人工评分：
 
 | Field | Score | Meaning |
 |---|---:|---|

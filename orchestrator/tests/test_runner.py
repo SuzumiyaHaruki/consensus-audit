@@ -35,19 +35,31 @@ def final_candidate(*, property_id: str | None) -> str:
 
 
 class FakeClient:
-    def __init__(self, *, tool_until_final: bool = False) -> None:
+    def __init__(
+        self, *, tool_until_final: bool = False, non_strict_early_output: bool = False
+    ) -> None:
         self.calls: list[list[dict[str, Any]]] = []
         self.tool_sets: list[list[dict[str, Any]]] = []
+        self.request_options: list[dict[str, Any]] = []
         self.tool_until_final = tool_until_final
+        self.non_strict_early_output = non_strict_early_output
 
     def create_chat_completion(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        *,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> ChatResponse:
         self.calls.append([dict(message) for message in messages])
         self.tool_sets.append(list(tools))
-        if tools and (self.tool_until_final or len(self.calls) == 1):
+        self.request_options.append(
+            {"response_format": response_format, "tool_choice": tool_choice}
+        )
+        if tools and tool_choice != "none" and (
+            self.tool_until_final or len(self.calls) == 1
+        ):
             return ChatResponse(
                 content="",
                 reasoning_content="I should inspect the source.",
@@ -73,8 +85,11 @@ class FakeClient:
             )
             if match is not None:
                 property_id = match.group(1)
+        content = final_candidate(property_id=property_id)
+        if self.non_strict_early_output and len(self.calls) == 2:
+            content = "Candidate follows.\n" + content
         return ChatResponse(
-            content=final_candidate(property_id=property_id),
+            content=content,
             reasoning_content="No candidate met the evidence threshold.",
             tool_calls=(),
             finish_reason="stop",
@@ -154,7 +169,7 @@ material_sets:
             )
             self.assertEqual(second_messages[-1]["role"], "tool")
 
-    def test_final_turn_disables_tools_and_forces_report(self) -> None:
+    def test_final_turn_forbids_tool_calls_and_forces_json(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             materials, target = self._fixture(root)
@@ -176,12 +191,42 @@ material_sets:
             self.assertEqual(result.tool_calls, 2)
             self.assertTrue(client.tool_sets[0])
             self.assertTrue(client.tool_sets[1])
-            self.assertEqual(client.tool_sets[2], [])
+            self.assertTrue(client.tool_sets[2])
+            self.assertEqual(client.request_options[2]["tool_choice"], "none")
+            self.assertEqual(
+                client.request_options[2]["response_format"], {"type": "json_object"}
+            )
             self.assertIn(
                 "This is the final Candidate-v0 turn",
                 client.calls[2][-1]["content"],
             )
             self.assertTrue((result.run_directory / "response.md").is_file())
+
+    def test_non_strict_early_output_gets_one_json_recovery_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            materials, target = self._fixture(root)
+            client = FakeClient(non_strict_early_output=True)
+
+            result = run_audit(
+                load_material_set(materials, "test"),
+                client,
+                RunConfig(
+                    property_id="Q-TEST-1",
+                    target_root=target,
+                    run_root=root / "runs",
+                    max_turns=4,
+                ),
+                model_metadata={"provider": "fake"},
+            )
+
+            self.assertEqual(result.turns, 3)
+            self.assertEqual(client.request_options[2]["tool_choice"], "none")
+            self.assertEqual(
+                client.request_options[2]["response_format"], {"type": "json_object"}
+            )
+            events = (result.run_directory / "events.jsonl").read_text(encoding="utf-8")
+            self.assertIn('"event_type": "candidate_format_recovery"', events)
 
     def test_baseline_episode_uses_shared_agent_loop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

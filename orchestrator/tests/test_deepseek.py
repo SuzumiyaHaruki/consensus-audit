@@ -82,6 +82,25 @@ class DeepSeekTests(unittest.TestCase):
             with self.assertRaises(DeepSeekError):
                 read_api_key_file(path)
 
+    def test_final_candidate_request_can_preserve_tools_and_force_json(self) -> None:
+        transport = FakeTransport()
+        client = DeepSeekClient(
+            DeepSeekConfig(api_key="test-key"), transport=transport
+        )
+        tool = {"type": "function", "function": {"name": "read_file"}}
+
+        client.create_chat_completion(
+            [{"role": "user", "content": "return JSON"}],
+            [tool],
+            response_format={"type": "json_object"},
+            tool_choice="none",
+        )
+
+        payload = transport.requests[0]["payload"]
+        self.assertEqual(payload["tools"], [tool])
+        self.assertEqual(payload["tool_choice"], "none")
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+
 
 if __name__ == "__main__":
     unittest.main()

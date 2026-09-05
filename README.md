@@ -228,7 +228,7 @@ baseline 会创建 `runs/<timestamp>-baseline-batch/`，其中包含 `baseline-r
 
 模型的原始输出仍保存在 `response.md`。格式不合法时运行记录为 `invalid_output`；格式合法后生成 `parsed-candidate.json`。provenance 校验只证明模型看过所引用的代码区间，不证明引用中的自然语言主张为真。
 
-解析器优先要求纯 JSON；如果响应包含且仅包含一个有效的 JSON 代码块，也会提取该对象，并在格式校验中记录代码围栏或外围说明文字警告。包含多个 JSON 对象或只有工具调用标记的响应仍为 `invalid_output`。已有运行可以在不调用模型的情况下重新解析：
+解析器优先要求纯 JSON；如果响应包含且仅包含一个有效 JSON 代码块，或在外围说明文字后包含一个有效 JSON 对象，也会提取该对象，并在格式校验中记录其非严格格式。包含多个 JSON 对象或只有工具调用标记的响应仍为 `invalid_output`。已有运行可以在不调用模型的情况下重新解析：
 
 ```bash
 consensus-audit revalidate-candidate \
@@ -242,7 +242,7 @@ consensus-audit build-evidence \
   --run-directory /path/to/property-run
 ```
 
-将一个运行目录树汇总为每次运行一行的 CSV，并预留人工评分列：
+将一个运行目录树汇总为每次运行一行的机器事实 CSV：
 
 ```bash
 consensus-audit collect-results \
@@ -250,7 +250,7 @@ consensus-audit collect-results \
   --output evaluation-results.csv
 ```
 
-该命令只收集 Candidate 状态、模型用量和源码读取成本，不会自动填写 mechanism 或 P/A/V/O 的人工分数。
+该命令只收集 Candidate 状态、模型用量、输出协议状态和源码读取成本。人工评分应从 `evaluation/score-template.csv` 复制到独立的 `annotations.csv`，不会被该命令覆盖。
 
 `--context-mode shared-evidence` 时，批次目录还包含：
 

@@ -28,3 +28,8 @@ scenario_requirements:
   decisive_actions: Deliver both incoming entries in one append request so the first comparison is skipped.
   violation: Leader and follower share a later term/index entry but have different preceding prefixes.
   oracle: Inspect both logical logs and compare the prefix preceding the shared later entry.
+trigger_validation:
+  hidden_test: evaluation/hidden-tests/run_m6_maybe_append.sh
+  clean_target_expected: pass
+  mutant_target_expected: fail
+  verified_on: 2026-09-05

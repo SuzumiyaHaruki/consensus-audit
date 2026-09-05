@@ -26,7 +26,7 @@ property-directed   = common_files + one Q
 matched-no-property = common_files
 ```
 
-因此处理变量是是否给出具体性质，而不是协议背景、完成语义、报告格式或源码工具。property-directed 从给定性质向实现义务和代码机制推进；matched-no-property 不预先选择性质，而是先检查协议相关代码，在形成具体机制后再表述或修正它所威胁的性质与实现义务，并将 `property_id` 设为 `null`。
+因此处理变量是是否给出具体性质，而不是协议背景、完成语义、报告格式或源码工具。property-directed 从给定性质向实现义务和代码机制推进；matched-no-property 不特权化任何性质，但允许模型在源码阅读中形成、修正或放弃临时性质假设，并将最终 `property_id` 设为 `null`。
 
 ## 协议、故障模型与目标边界
 

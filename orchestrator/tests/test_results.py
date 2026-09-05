@@ -56,6 +56,16 @@ class ResultCollectionTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (run / "candidate-format-validation.json").write_text(
+                json.dumps(
+                    {
+                        "parse_recoverable": True,
+                        "strict_output_compliant": True,
+                        "schema_valid": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             rows = collect_result_rows(root)
             self.assertEqual(len(rows), 1)
@@ -63,7 +73,7 @@ class ResultCollectionTests(unittest.TestCase):
             self.assertEqual(rows[0]["arm"], "guided")
             self.assertEqual(rows[0]["input_tokens"], 100)
             self.assertEqual(rows[0]["source_lines_read"], 75)
-            self.assertEqual(rows[0]["mechanism_score"], "")
+            self.assertTrue(rows[0]["strict_output_compliant"])
 
             rendered = render_result_csv(rows)
             parsed = list(csv.DictReader(io.StringIO(rendered)))

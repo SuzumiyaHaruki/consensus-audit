@@ -18,17 +18,10 @@ RESULT_FIELDS = [
     "arm",
     "run_id",
     "candidate_status",
-    "format_valid",
+    "parse_recoverable",
+    "strict_output_compliant",
+    "schema_valid",
     "provenance_valid",
-    "mechanism_score",
-    "evidence_score",
-    "property_linkage_score",
-    "P_score",
-    "A_score",
-    "V_score",
-    "O_score",
-    "uncertainty_discipline_score",
-    "duplicate_group",
     "input_tokens",
     "output_tokens",
     "total_tokens",
@@ -51,6 +44,10 @@ def _load_object(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ResultCollectionError(f"expected JSON object in {path}")
     return value
+
+
+def _load_optional_object(path: Path) -> dict[str, Any]:
+    return _load_object(path) if path.is_file() else {}
 
 
 def _usage_value(usage: dict[str, Any], *names: str) -> int | str:
@@ -99,6 +96,9 @@ def collect_result_rows(run_root: Path) -> list[dict[str, Any]]:
         summary = _load_object(summary_path)
         request = _load_object(request_path)
         evidence = _load_object(evidence_path)
+        validation = _load_optional_object(
+            run_directory / "candidate-format-validation.json"
+        )
         usage = summary.get("usage")
         if not isinstance(usage, dict):
             usage = {}
@@ -133,17 +133,15 @@ def collect_result_rows(run_root: Path) -> list[dict[str, Any]]:
                 "arm": arm,
                 "run_id": run_id,
                 "candidate_status": summary.get("candidate_status", ""),
-                "format_valid": summary.get("candidate_format_valid", ""),
+                "parse_recoverable": validation.get("parse_recoverable", ""),
+                "strict_output_compliant": validation.get(
+                    "strict_output_compliant", ""
+                ),
+                "schema_valid": validation.get(
+                    "schema_valid",
+                    summary.get("candidate_format_valid", ""),
+                ),
                 "provenance_valid": summary.get("candidate_provenance_valid", ""),
-                "mechanism_score": "",
-                "evidence_score": "",
-                "property_linkage_score": "",
-                "P_score": "",
-                "A_score": "",
-                "V_score": "",
-                "O_score": "",
-                "uncertainty_discipline_score": "",
-                "duplicate_group": "",
                 "input_tokens": _usage_value(usage, "prompt_tokens", "input_tokens"),
                 "output_tokens": _usage_value(
                     usage, "completion_tokens", "output_tokens"

@@ -24,6 +24,9 @@ class ChatClient(Protocol):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        *,
+        response_format: dict[str, Any] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> ChatResponse: ...
 
 
@@ -58,6 +61,13 @@ request more checks or tools, return Markdown prose, respond with a plan, or
 emit tool-call syntax such as XML/DSML tags. The first output character must be
 `{` and the last must be `}`.
 """
+
+
+def _is_strict_json_object(content: str) -> bool:
+    try:
+        return isinstance(json.loads(content), dict)
+    except json.JSONDecodeError:
+        return False
 
 
 SHARED_EVIDENCE_INSTRUCTION = """\
@@ -209,8 +219,8 @@ def _run_prompt(
     user_prompt += (
         f"\nRUN BUDGET: at most {config.max_turns} model turns and "
         f"{config.max_tool_calls} source-tool calls. Reserve enough budget for "
-        "the final Candidate-v0 JSON object. The final model turn is output-only and "
-        "has no tools.\n"
+        "the final Candidate-v0 JSON object. The final model turn carries the "
+        "tool schema only to preserve reasoning context; it cannot invoke tools.\n"
     )
     if config.allow_tests:
         user_prompt += (
@@ -253,10 +263,11 @@ def _run_prompt(
     total_usage: dict[str, int] = {}
     tool_call_count = 0
     start = time.monotonic()
+    format_recovery_pending = False
 
     try:
         for turn in range(1, config.max_turns + 1):
-            final_output_turn = turn == config.max_turns
+            final_output_turn = turn == config.max_turns or format_recovery_pending
             if turn == config.max_turns - 2 and not final_output_turn:
                 messages.append({"role": "user", "content": LATE_BUDGET_NOTICE})
                 events.append(
@@ -269,16 +280,24 @@ def _run_prompt(
                     {"role": "user", "content": FINAL_CANDIDATE_INSTRUCTION}
                 )
                 events.append("final_candidate_turn", turn=turn, tools_enabled=False)
+                format_recovery_pending = False
 
-            request_tools = [] if final_output_turn else tools
+            request_tools = tools
+            response_format = {"type": "json_object"} if final_output_turn else None
+            tool_choice = "none" if final_output_turn else None
             events.append(
                 "llm_request",
                 turn=turn,
                 message_count=len(messages),
-                tools_enabled=bool(request_tools),
+                tools_enabled=not final_output_turn and bool(request_tools),
                 remaining_turns=config.max_turns - turn + 1,
             )
-            response = client.create_chat_completion(messages, request_tools)
+            response = client.create_chat_completion(
+                messages,
+                request_tools,
+                response_format=response_format,
+                tool_choice=tool_choice,
+            )
             _add_usage(total_usage, response.usage)
             events.append(
                 "llm_response",
@@ -343,6 +362,11 @@ def _run_prompt(
                 )
 
             raw_candidate = response.content.strip()
+            if not final_output_turn and not _is_strict_json_object(raw_candidate):
+                messages.append(response.assistant_message())
+                format_recovery_pending = True
+                events.append("candidate_format_recovery", turn=turn)
+                continue
             (run_directory / "response.md").write_text(
                 raw_candidate + "\n", encoding="utf-8"
             )

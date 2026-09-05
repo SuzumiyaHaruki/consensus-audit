@@ -7,13 +7,13 @@ Use the supplied consensus implementation, protocol material, and fault model to
 `AUDIT_MODE` determines how the property is obtained:
 
 - `property-directed`: audit only the supplied selected property and copy its ID exactly into `property_id`.
-- `matched-no-property`: no specific property is supplied. Do not commit to a property before inspecting the implementation. Search for one concrete, code-supported mechanism, then formulate or refine the protocol property and implementation obligation that it may violate. Set `property_id` to `null` and state the resulting property in `property_statement`.
+- `matched-no-property`: no specific property is supplied or privileged. You may form provisional property hypotheses while inspecting the implementation, but revise or abandon them based on source evidence. Return one concrete, code-supported mechanism and formulate the resulting property and implementation obligation that it may violate. Set `property_id` to `null` and state the resulting property in `property_statement`.
 
 The two modes otherwise have the same source access, protocol context, event semantics, fault model, budget, and output contract.
 
 ## Required investigation
 
-1. Establish a code-supported property–obligation–mechanism chain. In `property-directed` mode, begin with the selected property and derive its implementation obligation. In `matched-no-property` mode, inspect protocol-relevant code without choosing a property in advance; let a concrete mechanism motivate the property and obligation, and revise that hypothesis as evidence is collected.
+1. Establish a code-supported property–obligation–mechanism chain. In `property-directed` mode, begin with the selected property and derive its implementation obligation. In `matched-no-property` mode, no property hypothesis is privileged; form, revise, or abandon hypotheses as source evidence is collected.
 2. Identify and verify one decisive ordering, guard, threshold, or state relation connecting the implementation mechanism to the obligation.
 3. Support it with executable source that you personally inspected.
 4. Give the minimal causal chain from the implementation mechanism to the property contradiction.

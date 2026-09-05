@@ -31,12 +31,21 @@ REQUIRED_TOP_LEVEL_KEYS = {
 @dataclass(frozen=True)
 class CandidateArtifacts:
     status: str
-    format_valid: bool
+    parse_recoverable: bool
+    strict_output_compliant: bool
+    schema_valid: bool
     provenance_valid: bool
     parsed_file: str | None
 
+    @property
+    def format_valid(self) -> bool:
+        """Backward-compatible alias for schema validity."""
+        return self.schema_valid
 
-def _extract_json_object(response: str) -> tuple[dict[str, Any] | None, list[str], list[str]]:
+
+def _extract_json_object(
+    response: str,
+) -> tuple[dict[str, Any] | None, bool, bool, list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
     text = response.strip()
@@ -67,14 +76,35 @@ def _extract_json_object(response: str) -> tuple[dict[str, Any] | None, list[str
                 warnings.append("ignored surrounding prose outside the JSON code fence")
         elif len(fenced_objects) > 1:
             errors.append("response contains multiple valid JSON code blocks")
-            return None, errors, warnings
+            return None, False, False, errors, warnings
         else:
-            errors.append(direct_error)
-            return None, errors, warnings
+            decoder = json.JSONDecoder()
+            prose_objects: list[dict[str, Any]] = []
+            for start in (match.start() for match in re.finditer(r"[{]", text)):
+                try:
+                    value, end = decoder.raw_decode(text[start:])
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(value, dict) and not text[start + end :].strip():
+                    prose_objects.append(value)
+            if len(prose_objects) == 1:
+                parsed = prose_objects[0]
+                warnings.append("extracted the unique JSON object following prose")
+            elif len(prose_objects) > 1:
+                errors.append("response contains multiple recoverable JSON objects")
+                return None, False, False, errors, warnings
+            else:
+                errors.append(direct_error)
+                return None, False, False, errors, warnings
+        strict_output_compliant = False
+        parse_recoverable = True
+    else:
+        strict_output_compliant = True
+        parse_recoverable = isinstance(parsed, dict)
     if not isinstance(parsed, dict):
         errors.append("Candidate-v0 output must be a JSON object")
-        return None, errors, warnings
-    return parsed, errors, warnings
+        return None, False, strict_output_compliant, errors, warnings
+    return parsed, parse_recoverable, strict_output_compliant, errors, warnings
 
 
 def _require_nonempty_string(
@@ -331,7 +361,9 @@ def write_candidate_artifacts(
     audit_mode: str,
     expected_property_id: str | None,
 ) -> CandidateArtifacts:
-    candidate, parse_errors, warnings = _extract_json_object(response)
+    candidate, parse_recoverable, strict_output_compliant, parse_errors, warnings = (
+        _extract_json_object(response)
+    )
     validation_errors = list(parse_errors)
     if candidate is not None:
         errors, schema_warnings = validate_candidate_format(
@@ -342,10 +374,14 @@ def write_candidate_artifacts(
         validation_errors.extend(errors)
         warnings.extend(schema_warnings)
 
+    schema_valid = candidate is not None and not validation_errors
     format_validation = {
         "schema_version": "candidate-format-validation/v1",
         "generated_at": utc_now(),
-        "valid": not validation_errors,
+        "valid": schema_valid,
+        "parse_recoverable": parse_recoverable,
+        "strict_output_compliant": strict_output_compliant,
+        "schema_valid": schema_valid,
         "errors": validation_errors,
         "warnings": warnings,
         "audit_mode": audit_mode,
@@ -353,7 +389,7 @@ def write_candidate_artifacts(
     }
     write_json(run_directory / "candidate-format-validation.json", format_validation)
 
-    if candidate is None or validation_errors:
+    if not schema_valid:
         write_json(
             run_directory / "candidate-provenance-validation.json",
             {
@@ -365,7 +401,7 @@ def write_candidate_artifacts(
                 "checked_references": [],
             },
         )
-        return CandidateArtifacts("invalid_output", False, False, None)
+        return CandidateArtifacts("invalid_output", parse_recoverable, strict_output_compliant, False, False, None)
 
     write_json(run_directory / "parsed-candidate.json", candidate)
     provenance = validate_candidate_provenance(
@@ -376,6 +412,8 @@ def write_candidate_artifacts(
     write_json(run_directory / "candidate-provenance-validation.json", provenance)
     return CandidateArtifacts(
         str(candidate["status"]),
+        parse_recoverable,
+        strict_output_compliant,
         True,
         bool(provenance["valid"]),
         "parsed-candidate.json",

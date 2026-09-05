@@ -174,7 +174,7 @@ def build_audit_prompt(
         "exactly one Candidate-v0 JSON object using the supplied output contract."
     )
     user_prompt = (
-        f"TARGET_ROOT={target_root.resolve()}\n"
+        "TARGET_ALIAS=anonymous-target\n"
         f"MATERIAL_SET={material_set.name}\n"
         "AUDIT_MODE=property-directed\n"
         + "".join(material_sections)
@@ -212,14 +212,15 @@ def build_baseline_prompt(
         "exactly one Candidate-v0 JSON object using the supplied output contract."
     )
     user_prompt = (
-        f"TARGET_ROOT={target_root.resolve()}\n"
+        "TARGET_ALIAS=anonymous-target\n"
         f"MATERIAL_SET={material_set.name}\n"
         "AUDIT_MODE=matched-no-property\n"
         + "".join(sections)
         + "\n===== RUN REQUEST =====\n"
-        + "No target property is supplied. Do not choose one in advance. Inspect "
-        "protocol-relevant implementation code for one concrete, code-supported "
-        "mechanism. Once such a mechanism emerges, formulate or refine the precise "
+        + "No target property is supplied or privileged. Inspect protocol-relevant "
+        "implementation code and form, revise, or abandon provisional property "
+        "hypotheses based on source evidence. Return the single most credible "
+        "code-supported consensus mechanism you identify, together with the precise "
         "property and implementation obligation it may violate. Return one "
         "Candidate-v0 JSON object as soon as you can support a status. Do not "
         "perform an exhaustive repository review. Follow REPORT_TEMPLATE.md.\n"

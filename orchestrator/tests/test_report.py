@@ -77,7 +77,9 @@ class CandidateReportTests(unittest.TestCase):
             )
 
             self.assertEqual(result.status, "candidate_found")
-            self.assertTrue(result.format_valid)
+            self.assertTrue(result.parse_recoverable)
+            self.assertTrue(result.strict_output_compliant)
+            self.assertTrue(result.schema_valid)
             self.assertTrue(result.provenance_valid)
             self.assertTrue((run / "parsed-candidate.json").is_file())
 
@@ -97,7 +99,9 @@ class CandidateReportTests(unittest.TestCase):
             )
 
             self.assertEqual(result.status, "invalid_output")
-            self.assertFalse(result.format_valid)
+            self.assertTrue(result.parse_recoverable)
+            self.assertTrue(result.strict_output_compliant)
+            self.assertFalse(result.schema_valid)
             validation = json.loads(
                 (run / "candidate-format-validation.json").read_text(encoding="utf-8")
             )
@@ -118,7 +122,7 @@ class CandidateReportTests(unittest.TestCase):
                 expected_property_id="Q-TEST-1",
             )
 
-            self.assertTrue(result.format_valid)
+            self.assertTrue(result.schema_valid)
             self.assertFalse(result.provenance_valid)
             validation = json.loads(
                 (run / "candidate-provenance-validation.json").read_text(
@@ -153,7 +157,9 @@ class CandidateReportTests(unittest.TestCase):
             )
 
             self.assertEqual(result.status, "no_candidate")
-            self.assertTrue(result.format_valid)
+            self.assertTrue(result.parse_recoverable)
+            self.assertFalse(result.strict_output_compliant)
+            self.assertTrue(result.schema_valid)
             self.assertTrue(result.provenance_valid)
 
     def test_extracts_one_fenced_candidate_surrounded_by_prose(self) -> None:
@@ -175,11 +181,31 @@ class CandidateReportTests(unittest.TestCase):
                 expected_property_id="Q-TEST-1",
             )
 
-            self.assertTrue(result.format_valid)
+            self.assertTrue(result.parse_recoverable)
+            self.assertFalse(result.strict_output_compliant)
+            self.assertTrue(result.schema_valid)
             validation = json.loads(
                 (run / "candidate-format-validation.json").read_text(encoding="utf-8")
             )
             self.assertIn("ignored surrounding prose", validation["warnings"][1])
+
+    def test_extracts_one_candidate_following_prose(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary)
+            target, manifest = self._fixture(run)
+
+            result = write_candidate_artifacts(
+                run,
+                "Investigation complete.\n" + json.dumps(candidate()),
+                target_root=target,
+                evidence_manifest=manifest,
+                audit_mode="property-directed",
+                expected_property_id="Q-TEST-1",
+            )
+
+            self.assertTrue(result.parse_recoverable)
+            self.assertFalse(result.strict_output_compliant)
+            self.assertTrue(result.schema_valid)
 
     def test_revalidate_updates_existing_run_without_model_call(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -212,6 +238,12 @@ class CandidateReportTests(unittest.TestCase):
             summary = json.loads((run / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["candidate_status"], "candidate_found")
             self.assertTrue(summary["candidate_format_valid"])
+            validation = json.loads(
+                (run / "candidate-format-validation.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(validation["parse_recoverable"])
+            self.assertFalse(validation["strict_output_compliant"])
+            self.assertTrue(validation["schema_valid"])
 
 
 if __name__ == "__main__":
